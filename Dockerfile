@@ -110,6 +110,10 @@ RUN set -eux; \
 COPY scripts/install-docker.sh /tmp/install-docker.sh
 RUN USERNAME=${USERNAME} bash /tmp/install-docker.sh && rm /tmp/install-docker.sh
 
+# dockerd startup helper. Consumers call this from postStartCommand.
+COPY scripts/docker-init.sh /usr/local/bin/docker-init.sh
+RUN chmod +x /usr/local/bin/docker-init.sh
+
 # ---------------------------------------------------------------------------
 # sekimore-gw agent-setup script
 # Pulled at build time so the image is self-contained and the devcontainer

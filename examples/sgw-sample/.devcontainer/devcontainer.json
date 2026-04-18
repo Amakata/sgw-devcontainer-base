@@ -20,6 +20,6 @@
     }
   },
   "remoteUser": "vscode",
-  "postStartCommand": "sudo /usr/local/bin/sekimore-agent-setup.sh && sh /workspace/.devcontainer/scripts/post-create.sh",
+  "postStartCommand": "sudo /usr/local/bin/sekimore-agent-setup.sh && /usr/local/bin/docker-init.sh && sh /workspace/.devcontainer/scripts/post-create.sh",
   "waitFor": "postStartCommand"
 }

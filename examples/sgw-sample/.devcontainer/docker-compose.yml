@@ -49,7 +49,8 @@ services:
       - claude-code-commandhistory:/commandhistory
       - pnpm-store:/pnpm-store
       - anyenv-store:/home/vscode/.anyenv/envs
-      - docker-store:/var/lib/docker/image
+      # overlayfs上でoverlayfsはネストできないため /var/lib/docker 全体を別ボリュームに逃がす
+      - docker-store:/var/lib/docker
       - ..:/workspace:cached
     environment:
       - CLAUDE_CONFIG_DIR=/home/vscode/.claude
@@ -62,6 +63,7 @@ services:
     cap_add:
       - NET_ADMIN
       - NET_RAW
+    privileged: true          # For docker in docker
     networks:
       internal-net: {}
     dns:
