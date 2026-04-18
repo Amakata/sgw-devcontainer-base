@@ -1,0 +1,65 @@
+# Sekimore Gateway - AI Agent Security Gateway
+# Sample Configuration for sgw-sample
+
+# Allowed Domain List
+# Wildcard notation: ".example.com" allows "*.example.com", "*.*.example.com", etc.
+allow_domains:
+  # AI
+  - storage.googleapis.com
+  - platform.claude.com
+  - api.anthropic.com
+  # debian
+  - deb.debian.org
+  # github
+  - github.com
+  - api.github.com
+  - raw.githubusercontent.com
+  - release-assets.githubusercontent.com
+  # vscode
+  - main.vscode-cdn.net
+  - www.vscode-unpkg.net
+  - marketplace.visualstudio.com
+  - packages.microsoft.com
+  # docker
+  - registry-1.docker.io
+  - auth.docker.io
+  - docker-images-prod.6aa30f8b08e16409b46e0173d6de2f56.r2.cloudflarestorage.com
+  - production.cloudflare.docker.com
+  # python
+  - www.python.org
+  - pypi.org
+  - .pythonhosted.org
+  # nodejs
+  - npmjs.com
+  - nodejs.org
+  - .npmjs.org
+  # docker compose service names
+  - sekimore-gw
+  - dev
+
+# Blocked Domain List
+block_domains: []
+
+# Allowed IP List (direct access)
+# ⚠️  Do NOT include external DNS servers (e.g., 8.8.8.8).
+allow_ips: []
+
+# Blocked IP List
+block_ips: []
+
+# Proxy Configuration
+proxy:
+  enabled: false
+  port: 3128
+  cache_enabled: true
+  cache_size_mb: 1000
+  upstream_proxy: proxy.example.com:3128
+  upstream_proxy_username: null
+  upstream_proxy_password: null
+
+# Network Configuration
+network:
+  lan_subnets: []
+
+# Database Path
+database_path: "/data/security_gateway.db"
