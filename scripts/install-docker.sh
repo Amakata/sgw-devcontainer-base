@@ -1,14 +1,17 @@
 #!/usr/bin/env bash
 #
-# Install Docker CE + buildx + compose plugin.
+# Install Docker CE + buildx + compose plugin in rootless mode.
 #
-# This is a simplified equivalent of
-# ghcr.io/devcontainers/features/docker-in-docker:2
-# baked into the base image at build time.
+# The inner dockerd runs as the non-root `vscode` user via
+# dockerd-rootless.sh (from docker-ce-rootless-extras), so the outer
+# devcontainer does NOT need --privileged.
 #
-# Runtime privileges (NET_ADMIN, cgroup, /var/lib/docker volume, dockerd startup)
-# are still the responsibility of the consuming devcontainer.json /
-# docker-compose.yml.
+# Runtime privileges required on the outer devcontainer:
+#   cap_add:       NET_ADMIN (for agent-setup's ip route)
+#   security_opt:  seccomp=unconfined, apparmor=unconfined, systempaths=unconfined
+#   devices:       /dev/fuse (for fuse-overlayfs fallback)
+#
+# dockerd startup itself is handled by /usr/local/bin/docker-init.sh.
 
 set -eux
 
@@ -43,15 +46,23 @@ apt-get update
 apt-get install -y --no-install-recommends \
     docker-ce \
     docker-ce-cli \
+    docker-ce-rootless-extras \
     containerd.io \
     docker-buildx-plugin \
-    docker-compose-plugin
+    docker-compose-plugin \
+    uidmap \
+    slirp4netns \
+    fuse-overlayfs \
+    dbus-user-session
 
-# Allow the non-root user to use docker without sudo.
-if ! getent group docker >/dev/null 2>&1; then
-    groupadd docker
+# Configure subuid/subgid for the non-root user so newuidmap/newgidmap
+# can allocate a 65536-wide sub-uid range for rootless dockerd.
+if ! grep -q "^${USERNAME}:" /etc/subuid; then
+    echo "${USERNAME}:100000:65536" >> /etc/subuid
 fi
-usermod -aG docker "${USERNAME}"
+if ! grep -q "^${USERNAME}:" /etc/subgid; then
+    echo "${USERNAME}:100000:65536" >> /etc/subgid
+fi
 
 apt-get clean
 rm -rf /var/lib/apt/lists/*
