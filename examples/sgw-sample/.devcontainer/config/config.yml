@@ -1,6 +1,9 @@
 # Sekimore Gateway - AI Agent Security Gateway
 # Sample Configuration for sgw-sample
 
+name: SGW Example | Sekimore
+description: SGW Example
+
 # Allowed Domain List
 # Wildcard notation: ".example.com" allows "*.example.com", "*.*.example.com", etc.
 allow_domains:
@@ -36,6 +39,9 @@ allow_domains:
   # docker compose service names
   - sekimore-gw
   - dev
+
+# Ignored Domain List (hidden from UI dashboard, but DNS resolves normally)
+ignore_domains: []
 
 # Blocked Domain List
 block_domains: []
