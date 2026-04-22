@@ -10,10 +10,11 @@
 #   - git-delta
 #   - GitHub CLI (gh)
 #   - zsh + oh-my-zsh + plugins
-#   - anyenv + anyenv-update, with pyenv/nodenv/rbenv/phpenv plugins pre-installed
+#   - mise (jdx/mise) — unified version manager for python/node/ruby/php/rust/...
 #     (no specific language versions — those are downstream's responsibility).
-#     A copy of ~/.anyenv/envs is staged at ~/.anyenv/envs-default so
-#     downstream can restore plugins after a volume mount shadows ~/.anyenv/envs.
+#     shims are on PATH via ENV, so non-interactive subprocesses (Claude Code
+#     tool invocations, `docker exec cmd`, make, etc.) resolve language binaries
+#     without needing `mise activate` to run.
 #   - Claude Code CLI
 #   - sekimore-gw agent-setup script (at /usr/local/bin/sekimore-agent-setup.sh)
 #   - AWS CLI v2                (== devcontainers/features/aws-cli)
@@ -138,36 +139,42 @@ RUN git clone --depth 1 https://github.com/zsh-users/zsh-completions.git        
     git clone --depth 1 https://github.com/marlonrichert/zsh-autocomplete.git      ${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/zsh-autocomplete
 
 # ---------------------------------------------------------------------------
-# anyenv + pyenv/nodenv/rbenv/phpenv plugins
+# mise (jdx/mise) — unified version manager
 #
-# Only the plugins themselves are installed here — no specific language
-# versions. Downstream images run e.g. `pyenv install 3.13.0` as needed.
+# Only mise itself is installed here — no specific language versions.
+# Downstream images run e.g. `mise use -g python@3.13.0` as needed.
 #
-# ~/.anyenv/envs is also copied to ~/.anyenv/envs-default so a devcontainer
-# that mounts an empty volume at ~/.anyenv/envs can restore the plugin
-# layout via:  rsync -a ~/.anyenv/envs-default/ ~/.anyenv/envs/
+# ~/.local/share/mise/installs is the data directory. Downstream images that
+# pre-install languages should stage a copy at ~/.local/share/mise/installs-default
+# so a devcontainer that mounts an empty volume there can restore via:
+#   rsync -a --ignore-existing \
+#     ~/.local/share/mise/installs-default/ \
+#     ~/.local/share/mise/installs/
+#   mise reshim
 # ---------------------------------------------------------------------------
-RUN git clone --depth 1 https://github.com/anyenv/anyenv ~/.anyenv
-ENV PATH="/home/${USERNAME}/.anyenv/bin:${PATH}"
+USER root
+RUN install -dm 0755 /etc/apt/keyrings && \
+    curl -fsSL https://mise.jdx.dev/gpg-key.pub \
+      -o /etc/apt/keyrings/mise-archive-keyring.asc && \
+    chmod a+r /etc/apt/keyrings/mise-archive-keyring.asc && \
+    echo "deb [signed-by=/etc/apt/keyrings/mise-archive-keyring.asc] https://mise.jdx.dev/deb stable main" \
+      > /etc/apt/sources.list.d/mise.list && \
+    apt-get update && apt-get install -y --no-install-recommends mise && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
-RUN mkdir -p ~/.anyenv/plugins && \
-    git clone --depth 1 https://github.com/znz/anyenv-update.git ~/.anyenv/plugins/anyenv-update
+USER ${USERNAME}
 
-SHELL ["/bin/zsh", "-lc"]
-RUN anyenv install --force-init && \
-    anyenv install pyenv && \
-    anyenv install nodenv && \
-    anyenv install rbenv && \
-    anyenv install phpenv && \
-    cp -a ~/.anyenv/envs ~/.anyenv/envs-default
+# Put the mise shims directory on PATH for EVERY process — including non-login
+# and non-interactive ones (Claude Code tool subprocesses, `docker exec cmd`,
+# postCreateCommand, make, etc.). /etc/profile.d is NOT read by those paths,
+# so we rely on Docker ENV here. `mise activate` in the zsh rc.d adds the
+# interactive-only cd hook on top of this.
+ENV PATH="/home/${USERNAME}/.local/share/mise/shims:${PATH}"
 
 # ---------------------------------------------------------------------------
 # Claude Code CLI
 # ---------------------------------------------------------------------------
 RUN curl -fsSL https://claude.ai/install.sh | bash -s stable
-
-# Drop back to default shell so downstream images aren't forced into zsh -lc.
-SHELL ["/bin/sh", "-c"]
 
 # ---------------------------------------------------------------------------
 # Default zsh rc.d snippets

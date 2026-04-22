@@ -4,17 +4,25 @@ set -e
 echo "=== sgw-sample devcontainer post-create ==="
 
 # ---------------------------------------------------------------------------
-# Restore anyenv envs from the image-staged copy.
+# Restore mise installs from the image-staged copy.
 #
-# docker-compose mounts a named volume onto ~/.anyenv/envs, which shadows
-# whatever was baked into the image. On first run the volume is empty, so
-# we copy the staged envs-default back into place. On subsequent runs the
-# volume already has content and rsync is a no-op.
+# docker-compose mounts a named volume onto ~/.local/share/mise/installs,
+# which shadows whatever was baked into the image. On first run the volume
+# is empty, so we copy the staged installs-default back into place. On
+# subsequent runs the volume already has content and rsync is a no-op.
+#
+# After restoring, regenerate shims so ~/.local/share/mise/shims points to
+# the (possibly newly-restored) installs tree.
 # ---------------------------------------------------------------------------
-if [ -d "$HOME/.anyenv/envs-default" ]; then
-  echo "Restoring anyenv envs from envs-default..."
-  mkdir -p "$HOME/.anyenv/envs"
-  rsync -a --ignore-existing "$HOME/.anyenv/envs-default/" "$HOME/.anyenv/envs/"
+if [ -d "$HOME/.local/share/mise/installs-default" ]; then
+  echo "Restoring mise installs from installs-default..."
+  mkdir -p "$HOME/.local/share/mise/installs"
+  rsync -a --ignore-existing \
+    "$HOME/.local/share/mise/installs-default/" \
+    "$HOME/.local/share/mise/installs/"
+  if command -v mise >/dev/null 2>&1; then
+    mise reshim
+  fi
 fi
 
 # ---------------------------------------------------------------------------

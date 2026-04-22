@@ -48,7 +48,7 @@ services:
       - claude-code-config:/home/vscode/.claude
       - claude-code-commandhistory:/commandhistory
       - pnpm-store:/pnpm-store
-      - anyenv-store:/home/vscode/.anyenv/envs
+      - mise-store:/home/vscode/.local/share/mise/installs
       # overlayfs上でoverlayfsはネストできないため /var/lib/docker 全体を別ボリュームに逃がす
       - docker-store:/var/lib/docker
       - ..:/workspace:cached
@@ -82,7 +82,7 @@ volumes:
     name: pnpm-store-${DEVCONTAINER_ID}
   docker-store:
     name: docker-store-${DEVCONTAINER_ID}
-  anyenv-store:
-    name: anyenv-store-${DEVCONTAINER_ID}
+  mise-store:
+    name: mise-store-${DEVCONTAINER_ID}
   gateway-data:
     name: gateway-data-${DEVCONTAINER_ID}

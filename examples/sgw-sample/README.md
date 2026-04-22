@@ -4,7 +4,8 @@
 
 - `sekimore-gw` を経由するネットワーク分離構成
 - base image を `FROM` するだけの薄い `Dockerfile`
-- 特定バージョンの Python / Node.js / PHP を `phpenv` 等でインストールする例
+- 特定バージョンの Python / Node.js / Ruby / Rust を `mise` でインストールする例
+  (PHP は Dockerfile でコメントアウトしてあり、必要に応じて有効化可能)
 
 ## 使い方
 
@@ -21,7 +22,7 @@ sgw-sample/
 └── .devcontainer/
     ├── devcontainer.json
     ├── docker-compose.yml          # dev + sekimore-gw の 2 サービス
-    ├── Dockerfile                  # FROM sgw-devcontainer-base + 特定バージョン install
+    ├── Dockerfile                  # FROM sgw-devcontainer-base + mise で特定バージョン install
     ├── .env.sample
     ├── .gitignore
     ├── config/
