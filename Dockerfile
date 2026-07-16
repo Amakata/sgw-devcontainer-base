@@ -16,6 +16,7 @@
 #     tool invocations, `docker exec cmd`, make, etc.) resolve language binaries
 #     without needing `mise activate` to run.
 #   - Claude Code CLI
+#   - OpenAI Codex CLI
 #   - sekimore-gw agent-setup script (at /usr/local/bin/sekimore-agent-setup.sh)
 #   - AWS CLI v2                (== devcontainers/features/aws-cli)
 #   - Docker CE + buildx + compose plugin   (== devcontainers/features/docker-in-docker)
@@ -49,6 +50,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       sudo \
       rsync \
       gnupg \
+      media-types \
+      chromium \
+      fonts-noto-cjk \
+      fonts-noto-color-emoji \
       # DB client dev headers
       libpq-dev default-libmysqlclient-dev \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
@@ -171,10 +176,50 @@ USER ${USERNAME}
 # interactive-only cd hook on top of this.
 ENV PATH="/home/${USERNAME}/.local/share/mise/shims:${PATH}"
 
+
+# Claude Codeの設定ファイルを配置
+RUN mkdir -p /etc/claude-code
+COPY managed-settings.json /etc/claude-code/managed-settings.json
+
+# ---------------------------------------------------------------------------
+# Bundle official Anthropic skills (pptx / docx / xlsx / pdf)
+#
+# Skills are placed in /etc/skel/.claude/skills/ so that post-create.sh can
+# copy them to each user's ~/.claude/skills/. Claude Code only resolves
+# skills from ~/.claude/skills/ or <workspace>/.claude/skills/, so a true
+# system-wide path is not supported.
+#
+# Source: https://github.com/anthropics/skills (main branch, sparse checkout)
+# ---------------------------------------------------------------------------
+RUN mkdir -p /etc/skel/.claude/skills && \
+  tmpdir="$(mktemp -d)" && \
+  git clone --depth 1 --filter=blob:none --sparse \
+    https://github.com/anthropics/skills.git "$tmpdir/skills" && \
+  git -C "$tmpdir/skills" sparse-checkout set \
+    skills/pptx \
+    skills/docx \
+    skills/xlsx \
+    skills/pdf && \
+  cp -r "$tmpdir/skills/skills/pptx" /etc/skel/.claude/skills/ && \
+  cp -r "$tmpdir/skills/skills/docx" /etc/skel/.claude/skills/ && \
+  cp -r "$tmpdir/skills/skills/xlsx" /etc/skel/.claude/skills/ && \
+  cp -r "$tmpdir/skills/skills/pdf"  /etc/skel/.claude/skills/ && \
+  rm -rf "$tmpdir"
+
 # ---------------------------------------------------------------------------
 # Claude Code CLI
 # ---------------------------------------------------------------------------
+USER ${USERNAME}
 RUN curl -fsSL https://claude.ai/install.sh | bash -s stable
+
+# ---------------------------------------------------------------------------
+# OpenAI Codex CLI
+# Requires Node.js 18+. mise is already on PATH, so we install a temporary
+# Node runtime via mise, install codex globally with npm, then leave the
+# shims in place. Downstream images that `mise use -g node@...` will
+# naturally keep codex available.
+# ---------------------------------------------------------------------------
+RUN mise use -g node@lts && npm install -g @openai/codex
 
 # ---------------------------------------------------------------------------
 # Default zsh rc.d snippets
