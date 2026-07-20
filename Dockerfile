@@ -178,6 +178,7 @@ ENV PATH="/home/${USERNAME}/.local/share/mise/shims:${PATH}"
 
 
 # Claude Codeの設定ファイルを配置
+USER root
 RUN mkdir -p /etc/claude-code
 COPY managed-settings.json /etc/claude-code/managed-settings.json
 
