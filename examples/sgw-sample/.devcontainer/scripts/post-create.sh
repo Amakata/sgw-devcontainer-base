@@ -64,14 +64,31 @@ fi
 sed -i 's/^plugins=(git)$/plugins=(git zsh-completions zsh-autosuggestions zsh-syntax-highlighting fast-syntax-highlighting)/' "$HOME/.zshrc"
 
 # ---------------------------------------------------------------------------
-# sekimore-relay guardrail: the operator's ssh-agent must NOT reach this sandbox.
-# With the relay, git authenticates upstream from inside sekimore-gw; if an agent is
-# visible here the key-propagation inversion is broken (see design D-6).
+# sekimore-relay guardrail: 依頼者の ssh-agent はこのサンドボックスに届いてはいけない。
+# relay 構成では上流 git の認証は sekimore-gw の中で行う。ここで agent が見えるなら鍵伝搬の反転が
+# 成立していないので、エラーで止めてホスト側の対処を促す (design D-6)。
+# VS Code Dev Containers 拡張は、VS Code プロセスに SSH_AUTH_SOCK があると無条件に転送する
+# (無効化設定なし: microsoft/vscode-remote-release#11413)。
 # ---------------------------------------------------------------------------
 if ssh-add -l >/dev/null 2>&1; then
-  echo "⚠️  WARNING: an ssh-agent with identities is reachable inside the dev container (SSH_AUTH_SOCK=${SSH_AUTH_SOCK:-unset})."
-  echo "    The operator's keys are exposed to the AI. Disable agent forwarding for this connection"
-  echo "    (Remote-SSH: remote.SSH.enableAgentForwarding=false, then 'Kill VS Code Server on Host')."
+  if [ "${SEKIMORE_ALLOW_AGENT_FORWARD:-0}" = "1" ]; then
+    echo "⚠️  ssh-agent is forwarded into the dev container (allowed by SEKIMORE_ALLOW_AGENT_FORWARD=1 — the AI can use the operator's keys)"
+  else
+    {
+      echo ""
+      echo "❌ ERROR: 依頼者の ssh-agent がこの dev コンテナに転送されています (SSH_AUTH_SOCK=${SSH_AUTH_SOCK:-unset})"
+      echo "   relay 構成では AI に依頼者の鍵を渡してはいけません。原因は VS Code Dev Containers 拡張で、"
+      echo "   ホストの VS Code に SSH_AUTH_SOCK があると無条件に転送します (無効化設定なし: vscode-remote-release#11413)。"
+      echo ""
+      echo "   対処: VS Code に SSH_AUTH_SOCK を見せずに起動してください。"
+      echo "     ターミナルから:       env -u SSH_AUTH_SOCK code <このプロジェクトのパス>"
+      echo "     Dock/Spotlight から:  launchctl unsetenv SSH_AUTH_SOCK   (Docker Desktop は先に起動しておく。gateway の agent はそこから渡る)"
+      echo "   その後 'Dev Containers: Reopen in Container' で開き直し、dev 内で 'ssh-add -l' が失敗することを確認してください。"
+      echo "   一時的に許容する場合のみ SEKIMORE_ALLOW_AGENT_FORWARD=1 (非推奨)。"
+      echo ""
+    } >&2
+    exit 1
+  fi
 fi
 
 echo "✅ post-create done. Open a new terminal to pick up zsh settings."
