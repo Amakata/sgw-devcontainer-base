@@ -24,7 +24,8 @@
    転送するため (無効化設定なし)。普通に開くと post-create が **ERROR で止まり**、この手順を案内する
 4. gateway 側の初回だけ **`mise run gw:login`** (device flow。上流トークンと known_hosts を保存)
 5. **`mise run dev:signing-key`** で表示される署名用公開鍵を GitHub の Settings → SSH and GPG keys に
-   "Signing Key" として登録する (AI のコミットが依頼者の鍵ではなくこの鍵で署名される)
+   "Signing Key" として登録する (AI のコミットがあなたの鍵ではなくこの鍵で署名される)。鍵のコメント
+   (= GitHub の Title) は「sekimore-agent-signing: <案件名> / <あなたの名前> <メール>」。変えたいときは `.env` の `SEKIMORE_SIGNING_KEY_COMMENT`
 6. **`mise run relay:verify`** で一式を確認する (gateway の状態、dev に agent が届いていないこと、関所経由の git、案件外の拒否)
 
 日常: `mise run gw:check` (状態) / `mise run gw:tokens` / `mise run gw:audit` (監査ログ) / `mise run gw:revoke-project` (案件終了) /
