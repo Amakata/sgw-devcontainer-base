@@ -64,9 +64,9 @@ vscode_procs() {
   case "$os" in
     Darwin)
       if [ -n "$APP" ]; then
-        ps -axo pid=,command= | grep -F "$APP/Contents/MacOS/$EXE" | grep -Ev 'Helper|--type=|Frameworks/' || true
+        ps -axo pid=,command= | grep -F "$APP/Contents/MacOS/$EXE" | grep -Ev 'Helper|--type=|Frameworks/| grep ' || true
       else
-        ps -axo pid=,command= | grep -F '/Contents/MacOS/' | grep -Ei 'visual studio code|/code( - insiders)?\.app' | grep -Ev 'Helper|--type=|Frameworks/' || true
+        ps -axo pid=,command= | grep -F '/Contents/MacOS/' | grep -Ei 'visual studio code|/code( - insiders)?\.app' | grep -Ev 'Helper|--type=|Frameworks/| grep ' || true
       fi ;;
     *) ps -axo pid=,command= | grep -E '^ *[0-9]+ +(/[^ ]*/)?code(-insiders)?( |$)' || true ;;
   esac
