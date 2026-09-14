@@ -34,7 +34,7 @@ sekimore-gw (セキュリティゲートウェイ) を経由するネットワ�
 - Docker CE + buildx + compose plugin
 - `sekimore-gw` agent-setup script (`/usr/local/bin/sekimore-agent-setup.sh`) と
   `sekimore-relay` CLI (`/usr/local/bin/sekimore-relay`)、ラッパー `sekimore`。
-  どちらも **同じ `sekimore-gw` イメージ** (`ARG SEKIMORE_GW_IMAGE`、既定 `ghcr.io/amakata/sekimore-gw:0.1.1`)
+  どちらも **同じ `sekimore-gw` イメージ** (`ARG SEKIMORE_GW_IMAGE`、既定 `ghcr.io/amakata/sekimore-gw:0.1.2`)
   から `COPY --from` で取るので版がずれない。gateway に relay (git / GitHub API 中継関所) が居れば
   agent-setup が使い捨て鍵・案件トークン・known_hosts・署名鍵を自動で用意する
   (`examples/sgw-sample/.devcontainer/docker-compose.relay.yml` 参照)
@@ -85,7 +85,7 @@ GitHub Actions (`.github/workflows/build-and-push.yml`) が次のタグで GHCR 
 
 | このイメージ | 取り込む sekimore-gw | 備考 |
 | --- | --- | --- |
-| main 以降 | `0.1.1` (`ARG SEKIMORE_GW_IMAGE`) | relay 同梱。`--build-arg SEKIMORE_GW_IMAGE=...` で差し替え可 |
+| main 以降 | `0.1.2` (`ARG SEKIMORE_GW_IMAGE`) | relay 同梱。`--build-arg SEKIMORE_GW_IMAGE=...` で差し替え可 |
 
 更新順序: sekimore-gw をタグ → GHCR 公開 → このリポジトリの `SEKIMORE_GW_IMAGE` 既定を上げて push →
 GHCR 公開 → `examples/sgw-sample` の compose の image tag を追従。base はバイナリを gateway イメージから取るため、
