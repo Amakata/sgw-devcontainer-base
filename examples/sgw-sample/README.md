@@ -18,7 +18,8 @@
    (`SEKIMORE_AGENT_SOCK` は依頼者の ssh-agent socket。Docker Desktop なら既定値のままでよい)
 2. `config/config.yml` の `relay.project.repos` / `permissions` をこのプロジェクトのものに書き換える
 3. Docker Desktop を (ssh-agent が使える状態で) 起動し、**VS Code を完全終了 (Cmd+Q) してから** Terminal.app で **`mise run vscode`** を実行して "Reopen in Container"。
-   起動中の VS Code があると新しい `code` はそれに渡るだけなので、`SSH_AUTH_SOCK` 無しにならない (task が検査して止める。`mise run vscode:check` で確認できる)。
+   macOS の `code` CLI は `open` 経由で本体を起動するため `env -u SSH_AUTH_SOCK code` では届かない。この task は launchd の `SSH_AUTH_SOCK` を外し、
+   本体を直接起動し、起動後に本体の環境を確認する (`mise run vscode:check`)。Docker Desktop を再起動するときは先に `mise run vscode:restore-agent-env`。
    `SSH_AUTH_SOCK` を渡さずに VS Code を起動するのは、Dev Containers 拡張が依頼者の ssh-agent を無条件に dev へ
    転送するため (無効化設定なし)。普通に開くと post-create が **ERROR で止まり**、この手順を案内する
 4. gateway 側の初回だけ **`mise run gw:login`** (device flow。上流トークンと known_hosts を保存)

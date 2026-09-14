@@ -12,12 +12,16 @@ SGW = "{{config_root}}/.devcontainer/scripts/sgw.sh"
 
 # ---- 起動 ----
 [tasks.vscode]
-description = "VS Code を SSH_AUTH_SOCK 無しで開く (起動中の VS Code があれば先に終了を促し、起動後に本体の環境を確認する)"
+description = "VS Code を SSH_AUTH_SOCK が届かない状態で起動する (launchd の変数を外し、open を通さず直接起動、起動後に本体の環境を確認)"
 run = 'bash "$MISE_PROJECT_ROOT/.devcontainer/scripts/vscode.sh"'
 
 [tasks."vscode:check"]
-description = "起動中の VS Code が SSH_AUTH_SOCK を持っているか確認する (持っていれば依頼者の agent が dev に転送される)"
+description = "launchd / Docker Desktop / 起動中の VS Code の SSH_AUTH_SOCK の状態を表示する"
 run = 'bash "$MISE_PROJECT_ROOT/.devcontainer/scripts/vscode.sh" --check'
+
+[tasks."vscode:restore-agent-env"]
+description = "launchd に SSH_AUTH_SOCK を戻す (mise run vscode が外したもの。Docker Desktop を再起動する前に実行)"
+run = 'bash "$MISE_PROJECT_ROOT/.devcontainer/scripts/vscode.sh" --restore-agent-env'
 
 [tasks.web]
 description = "sekimore-gw の Web UI をブラウザで開く"
