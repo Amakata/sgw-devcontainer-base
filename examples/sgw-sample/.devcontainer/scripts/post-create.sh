@@ -63,4 +63,15 @@ fi
 
 sed -i 's/^plugins=(git)$/plugins=(git zsh-completions zsh-autosuggestions zsh-syntax-highlighting fast-syntax-highlighting)/' "$HOME/.zshrc"
 
+# ---------------------------------------------------------------------------
+# sekimore-relay guardrail: the operator's ssh-agent must NOT reach this sandbox.
+# With the relay, git authenticates upstream from inside sekimore-gw; if an agent is
+# visible here the key-propagation inversion is broken (see design D-6).
+# ---------------------------------------------------------------------------
+if ssh-add -l >/dev/null 2>&1; then
+  echo "⚠️  WARNING: an ssh-agent with identities is reachable inside the dev container (SSH_AUTH_SOCK=${SSH_AUTH_SOCK:-unset})."
+  echo "    The operator's keys are exposed to the AI. Disable agent forwarding for this connection"
+  echo "    (Remote-SSH: remote.SSH.enableAgentForwarding=false, then 'Kill VS Code Server on Host')."
+fi
+
 echo "✅ post-create done. Open a new terminal to pick up zsh settings."

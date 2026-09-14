@@ -1,6 +1,6 @@
 {
   "name": "sgw-sample | Secure Dev Environment",
-  "dockerComposeFile": "docker-compose.yml",
+  "dockerComposeFile": ["docker-compose.yml", "docker-compose.relay.yml"],
   "service": "dev",
   "workspaceFolder": "/workspace",
   "customizations": {

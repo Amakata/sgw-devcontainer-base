@@ -25,6 +25,14 @@
 #   - sekimore-gw service itself (runs as a separate compose service)
 #   - /workspace contents, .env, config.yml, zsh rc.d overlays
 #   - anything pinned to a specific project layout
+# ---------------------------------------------------------------------------
+# sekimore-gw image: source of the sekimore-relay binary (static musl) and the
+# agent-setup script. Taking both from the SAME tag keeps them in lock-step.
+# Override for local testing: --build-arg SEKIMORE_GW_IMAGE=sekimore-gw:relay-dev
+# ---------------------------------------------------------------------------
+ARG SEKIMORE_GW_IMAGE=ghcr.io/amakata/sekimore-gw:0.1.2
+FROM ${SEKIMORE_GW_IMAGE} AS sekimore-gw
+
 FROM mcr.microsoft.com/devcontainers/base:bookworm
 
 ARG USERNAME=vscode
@@ -121,14 +129,19 @@ COPY scripts/docker-init.sh /usr/local/bin/docker-init.sh
 RUN chmod +x /usr/local/bin/docker-init.sh
 
 # ---------------------------------------------------------------------------
-# sekimore-gw agent-setup script
-# Pulled at build time so the image is self-contained and the devcontainer
-# can run `sudo /usr/local/bin/sekimore-agent-setup.sh` without network fetch.
+# sekimore-gw agent-setup script + sekimore-relay CLI
+#
+# Both come from the sekimore-gw image (see the sekimore-gw stage at the top),
+# so the devcontainer can run `sudo /usr/local/bin/sekimore-agent-setup.sh`
+# without a network fetch, and `sekimore` / `sekimore-relay agent ...` talk to
+# the relay with the project token that agent-setup writes to
+# /etc/sekimore-agent/env.
 # ---------------------------------------------------------------------------
-ARG SEKIMORE_AGENT_REF=main
-RUN wget -qO /usr/local/bin/sekimore-agent-setup.sh \
-      "https://raw.githubusercontent.com/Amakata/sekimore-gw/${SEKIMORE_AGENT_REF}/agent-setup.sh" \
-    && chmod +x /usr/local/bin/sekimore-agent-setup.sh
+COPY --from=sekimore-gw /usr/local/share/sekimore/agent-setup.sh /usr/local/bin/sekimore-agent-setup.sh
+COPY --from=sekimore-gw /usr/local/bin/sekimore-relay /usr/local/bin/sekimore-relay
+COPY scripts/sekimore /usr/local/bin/sekimore
+RUN chmod +x /usr/local/bin/sekimore-agent-setup.sh /usr/local/bin/sekimore-relay /usr/local/bin/sekimore
+RUN mkdir -p /etc/sekimore-agent
 
 # ---------------------------------------------------------------------------
 # zsh / oh-my-zsh / plugins  (as vscode user)

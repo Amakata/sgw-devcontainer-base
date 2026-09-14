@@ -1,0 +1,31 @@
+# sekimore-relay overlay (git / GitHub API relay inside sekimore-gw).
+#
+# Listed in devcontainer.json after docker-compose.yml. Remove it there — and the
+# `domain_handlers:` / `relay:` blocks from config/config.yml — to run without the relay.
+#
+# What it does:
+#   * sekimore-gw gets the operator's ssh-agent. Mount the DIRECTORY that holds the
+#     socket (the socket path itself changes per session), see .env.sample.
+#   * dev keeps its disposable relay keys in a volume so they survive rebuilds.
+#
+# Requirement for the whole design: the operator's agent must NOT be forwarded into
+# `dev` (verify with `ssh-add -l` inside dev — it must fail). See
+# doc/sgw-devcontainer-base/design/sekimore-relay-agent.md (D-6) for how to stop the
+# Dev Containers extension's implicit forwarding.
+services:
+  sekimore-gw:
+    volumes:
+      - ${SEKIMORE_AGENT_SOCK_DIR:?set SEKIMORE_AGENT_SOCK_DIR in .env to the VM directory that contains agent.sock}:/ssh-agent:ro
+    environment:
+      - SSH_AUTH_SOCK=/ssh-agent/agent.sock
+
+  dev:
+    volumes:
+      - sekimore-agent-keys:/home/vscode/.ssh/sekimore
+    environment:
+      # Optional knobs read by sekimore-agent-setup.sh (defaults shown)
+      - SEKIMORE_BOOTSTRAP=${SEKIMORE_BOOTSTRAP:-auto}
+
+volumes:
+  sekimore-agent-keys:
+    name: sekimore-agent-keys-${DEVCONTAINER_ID}
