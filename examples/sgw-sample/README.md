@@ -14,7 +14,7 @@
 
 1. このディレクトリを VS Code で開いて "Reopen in Container"
 2. `.devcontainer/.env.sample` を `.devcontainer/.env` にコピーして値を埋める
-   (`SEKIMORE_AGENT_SOCK_DIR` は VM 側で依頼者の ssh-agent socket を置いたディレクトリ)
+   (`SEKIMORE_AGENT_SOCK` は依頼者の ssh-agent socket。Docker Desktop なら既定値のままでよい)
 3. `config/config.yml` の `relay.project.repos` / `permissions` をこのプロジェクトのものに書き換える
 4. 起動後、post-create の出力に **"an ssh-agent ... is reachable inside the dev container"** の警告が出たら、
    Dev Containers の暗黙の agent 転送が生きている。Remote-SSH の `remote.SSH.enableAgentForwarding` を
