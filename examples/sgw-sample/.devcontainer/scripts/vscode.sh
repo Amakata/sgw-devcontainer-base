@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # vscode.sh — VS Code を「SSH_AUTH_SOCK が届かない状態」で起動する (mise run vscode)。ホスト (Mac) 側で実行する。
 #
-# Dev Containers 拡張は VS Code 本体の環境に SSH_AUTH_SOCK があると依頼者の ssh-agent を無条件に dev へ転送する
+# Dev Containers 拡張は VS Code 本体の環境に SSH_AUTH_SOCK があると操作者 (あなた) の SSH 鍵 (ssh-agent) を無条件にコンテナへ転送する
 # (無効化設定なし: vscode-remote-release#11413)。単純な `env -u SSH_AUTH_SOCK code …` は macOS では効かない:
 #   1. `code` CLI は macOS (Big Sur 以降) では `open -n -a …` で本体を起動する。open は LaunchServices 経由なので
 #      本体はシェルではなく launchd の環境 (SSH_AUTH_SOCK=/private/tmp/com.apple.launchd.*/Listeners) を継ぐ
@@ -105,7 +105,7 @@ report() {  # 戻り値 0 = VS Code が起動中で SSH_AUTH_SOCK を持って�
   if [ "$found" -eq 0 ]; then echo "VS Code:               not running"; return 1; fi
   vscode_procs | cut -c1-160 | sed 's/^/  process: /'
   if [ "$dirty" -eq 1 ]; then
-    echo "VS Code:               RUNNING WITH SSH_AUTH_SOCK — Dev Containers が依頼者の agent を dev に転送する"; return 0
+    echo "VS Code:               RUNNING WITH SSH_AUTH_SOCK — このままだとあなたの SSH 鍵がコンテナ内の AI から使えてしまう"; return 0
   fi
   echo "VS Code:               running without SSH_AUTH_SOCK (OK)"; return 1
 }

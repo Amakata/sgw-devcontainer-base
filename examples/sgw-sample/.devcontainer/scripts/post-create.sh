@@ -63,30 +63,34 @@ fi
 
 sed -i 's/^plugins=(git)$/plugins=(git zsh-completions zsh-autosuggestions zsh-syntax-highlighting fast-syntax-highlighting)/' "$HOME/.zshrc"
 
+
 # ---------------------------------------------------------------------------
-# sekimore-relay guardrail: 依頼者の ssh-agent はこのサンドボックスに届いてはいけない。
-# relay 構成では上流 git の認証は sekimore-gw の中で行う。ここで agent が見えるなら鍵伝搬の反転が
-# 成立していないので、エラーで止めてホスト側の対処を促す (design D-6)。
-# VS Code Dev Containers 拡張は、VS Code プロセスに SSH_AUTH_SOCK があると無条件に転送する
-# (無効化設定なし: microsoft/vscode-remote-release#11413)。
+# sekimore-relay guardrail: 操作者 (人間) の SSH 鍵 = ssh-agent は、この AI 用コンテナから使えてはいけない。
+# relay 構成では GitHub への認証は sekimore-gw の中で行う。ここで ssh-agent が見えるなら鍵伝搬の反転が
+# 成立していないので、エラーで止めて Mac 側の手順を案内する (design D-6)。
+# VS Code Dev Containers 拡張は、VS Code 本体が ssh-agent を使える状態だと必ずコンテナへ転送する
+# (止める設定なし: microsoft/vscode-remote-release#11413)。
 # ---------------------------------------------------------------------------
 if ssh-add -l >/dev/null 2>&1; then
   if [ "${SEKIMORE_ALLOW_AGENT_FORWARD:-0}" = "1" ]; then
-    echo "⚠️  ssh-agent is forwarded into the dev container (allowed by SEKIMORE_ALLOW_AGENT_FORWARD=1 — the AI can use the operator's keys)"
+    echo "⚠️  あなたの Mac の SSH 鍵 (ssh-agent) がこのコンテナから使える状態です。SEKIMORE_ALLOW_AGENT_FORWARD=1 のため続行しますが、AI があなたの鍵を使えます。"
   else
     {
       echo ""
-      echo "❌ ERROR: 依頼者の ssh-agent がこの dev コンテナに転送されています (SSH_AUTH_SOCK=${SSH_AUTH_SOCK:-unset})"
-      echo "   relay 構成では AI に依頼者の鍵を渡してはいけません。原因は VS Code Dev Containers 拡張で、"
-      echo "   ホストの VS Code に SSH_AUTH_SOCK があると無条件に転送します (無効化設定なし: vscode-remote-release#11413)。"
+      echo "❌ 起動を中止しました: あなたの Mac の SSH 鍵 (ssh-agent) が、この開発コンテナから使える状態になっています。"
+      echo "   この構成では、コンテナ内の AI にあなたの鍵を使わせません。GitHub への認証は sekimore-gw が代わりに行います。"
       echo ""
-      echo "   対処: VS Code に SSH_AUTH_SOCK を見せずに起動してください。"
-      echo "     ターミナルから:       mise run vscode"
-      echo "                           (macOS の code CLI は open 経由で起動するので env -u だけでは届かない。この task が launchd の変数を外して本体を直接起動する)"
-      echo "                           ※ VS Code は先に Cmd+Q で完全終了。VS Code の統合ターミナルからではなく Terminal.app / iTerm から実行する"
-      echo "     Docker Desktop は先に (SSH_AUTH_SOCK ありで) 起動しておく。gateway の agent はそこから渡る。戻すには mise run vscode:restore-agent-env"
-      echo "   その後 'Dev Containers: Reopen in Container' で開き直し、dev 内で 'ssh-add -l' が失敗することを確認してください。"
-      echo "   一時的に許容する場合のみ .devcontainer/.env に SEKIMORE_ALLOW_AGENT_FORWARD=1 (非推奨。Rebuild で反映)。"
+      echo "   直し方 (Mac 側で、この順に):"
+      echo "     1. VS Code を Cmd+Q で完全に終了する"
+      echo "     2. Terminal.app で実行する (VS Code の中のターミナルは不可):"
+      echo "          cd <このプロジェクトのフォルダ> && mise run vscode"
+      echo "        → VS Code が「SSH 鍵を使えない状態」で起動します"
+      echo "     3. その VS Code で「Dev Containers: Reopen in Container」を実行する"
+      echo "     4. 確認: コンテナ内で ssh-add -l が失敗 (Could not open a connection to your authentication agent) すれば OK"
+      echo ""
+      echo "   なぜ: VS Code の Dev Containers 拡張は、VS Code 自身が SSH 鍵を使える状態だとコンテナへ必ず転送します (止める設定なし)。"
+      echo "        mise run vscode は VS Code だけに SSH 鍵を見せずに起動します。Docker Desktop (sekimore-gw に鍵を渡す側) には影響しません。"
+      echo "   一時的に無視して起動したい場合: .devcontainer/.env に SEKIMORE_ALLOW_AGENT_FORWARD=1 を書いて Rebuild (非推奨)"
       echo ""
     } >&2
     exit 1
