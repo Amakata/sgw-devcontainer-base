@@ -88,7 +88,7 @@ case "$MODE" in
   --check) if report; then exit 1; else exit 0; fi ;;
   --restore-agent-env) restore_agent_env; exit 0 ;;
   launch) ;;
-  *) sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 2 ;;
+  *) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 2 ;;
 esac
 
 if [ "${TERM_PROGRAM:-}" = "vscode" ]; then
