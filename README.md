@@ -59,6 +59,7 @@ sekimore-gw (セキュリティゲートウェイ) を経由するネットワ�
 ## Usage
 
 完全なサンプルは [`examples/sgw-sample/`](examples/sgw-sample/) を参照。
+sample の `mise.toml` にホスト側の操作 (`mise run vscode` / `gw:login` / `relay:verify` など) がまとまっている。
 最小構成は次の通り:
 
 ```dockerfile

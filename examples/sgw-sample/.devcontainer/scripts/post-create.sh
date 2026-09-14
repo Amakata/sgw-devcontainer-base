@@ -81,7 +81,7 @@ if ssh-add -l >/dev/null 2>&1; then
       echo "   ホストの VS Code に SSH_AUTH_SOCK があると無条件に転送します (無効化設定なし: vscode-remote-release#11413)。"
       echo ""
       echo "   対処: VS Code に SSH_AUTH_SOCK を見せずに起動してください。"
-      echo "     ターミナルから:       env -u SSH_AUTH_SOCK code <このプロジェクトのパス>"
+      echo "     ターミナルから:       mise run vscode   (= env -u SSH_AUTH_SOCK code <このプロジェクトのパス>)"
       echo "     Dock/Spotlight から:  launchctl unsetenv SSH_AUTH_SOCK   (Docker Desktop は先に起動しておく。gateway の agent はそこから渡る)"
       echo "   その後 'Dev Containers: Reopen in Container' で開き直し、dev 内で 'ssh-add -l' が失敗することを確認してください。"
       echo "   一時的に許容する場合のみ SEKIMORE_ALLOW_AGENT_FORWARD=1 (非推奨)。"

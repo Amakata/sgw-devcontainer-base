@@ -12,27 +12,33 @@
 
 ## 使い方
 
-1. このディレクトリを VS Code で開いて "Reopen in Container"
-2. `.devcontainer/.env.sample` を `.devcontainer/.env` にコピーして値を埋める
+ホスト (Mac + Docker Desktop) 側の操作は `mise.toml` の task にまとめてある (`mise tasks` で一覧)。
+
+1. `.devcontainer/.env.sample` を `.devcontainer/.env` にコピーして値を埋める
    (`SEKIMORE_AGENT_SOCK` は依頼者の ssh-agent socket。Docker Desktop なら既定値のままでよい)
-3. `config/config.yml` の `relay.project.repos` / `permissions` をこのプロジェクトのものに書き換える
-4. 起動後、post-create の出力に **"an ssh-agent ... is reachable inside the dev container"** の警告が出たら、
-   Dev Containers の暗黙の agent 転送が生きている。Remote-SSH の `remote.SSH.enableAgentForwarding` を
-   false にして "Kill VS Code Server on Host" → 再接続で止める (dev 内で `ssh-add -l` が失敗すれば OK)
-5. agent-setup の出力に表示される **署名用公開鍵** を GitHub の Settings → SSH and GPG keys に
+2. `config/config.yml` の `relay.project.repos` / `permissions` をこのプロジェクトのものに書き換える
+3. Docker Desktop を (ssh-agent が使える状態で) 起動してから、**`mise run vscode`** で VS Code を開き "Reopen in Container"。
+   `SSH_AUTH_SOCK` を渡さずに VS Code を起動するのは、Dev Containers 拡張が依頼者の ssh-agent を無条件に dev へ
+   転送するため (無効化設定なし)。普通に開くと post-create が **ERROR で止まり**、この手順を案内する
+4. gateway 側の初回だけ **`mise run gw:login`** (device flow。上流トークンと known_hosts を保存)
+5. **`mise run dev:signing-key`** で表示される署名用公開鍵を GitHub の Settings → SSH and GPG keys に
    "Signing Key" として登録する (AI のコミットが依頼者の鍵ではなくこの鍵で署名される)
-6. gateway 側の初回だけ `docker compose exec sekimore-gw sekimore-relay login` (device flow) を実行する
+6. **`mise run relay:verify`** で一式を確認する (gateway の状態、dev に agent が届いていないこと、関所経由の git、案件外の拒否)
+
+日常: `mise run gw:check` (状態) / `mise run gw:tokens` / `mise run gw:audit` (監査ログ) / `mise run gw:revoke-project` (案件終了) /
+`mise run gw -- <sekimore-relay の任意のサブコマンド>`。
 
 relay を使わない場合は `devcontainer.json` の `dockerComposeFile` から `docker-compose.relay.yml` を外し、
-`config/config.yml` の `domain_handlers:` / `relay:` を消す。
+`config/config.yml` の `domain_handlers:` / `relay:` を消す (`mise.toml` の gw:* / relay:* も不要になる)。
 
-新しいプロジェクトに使う場合は `.devcontainer/` ごとコピーする。
+新しいプロジェクトに使う場合は `.devcontainer/` と `mise.toml` をコピーする。
 
 ## ファイル構成
 
 ```
 sgw-sample/
 ├── README.md
+├── mise.toml                       # ホスト側の操作 (vscode / gw:login / gw:check / relay:verify …)
 └── .devcontainer/
     ├── devcontainer.json
     ├── docker-compose.yml          # dev + sekimore-gw の 2 サービス
@@ -45,7 +51,8 @@ sgw-sample/
     │   └── squid/
     │       └── squid.conf.template
     ├── scripts/
-    │   └── post-create.sh          # zsh rc.d の展開など
+    │   ├── post-create.sh          # zsh rc.d の展開、agent 転送の検知 (ERROR で止める)
+    │   └── sgw.sh                  # mise task が使う: compose ラベルで gateway / dev コンテナを見つけて docker exec
     └── zsh-config/
         └── rc.d/                   # プロジェクト固有 zsh 設定
 ```
