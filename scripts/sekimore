@@ -1,0 +1,19 @@
+#!/bin/sh
+# sekimore — agent-side CLI for the sekimore-relay (git / GitHub API gateway).
+#
+# Loads the project token and endpoint that sekimore-agent-setup.sh wrote to
+# /etc/sekimore-agent/env (unless already in the environment), then runs
+# `sekimore-relay agent "$@"`. Works from any process, not only interactive
+# shells (Claude Code tool calls, `docker exec`, scripts).
+#
+#   sekimore whoami
+#   sekimore pr create --head sekimore/main-abc1234 --base main --title T
+#   sekimore issue create --title T [--labels a,b]
+ENV_FILE=${SEKIMORE_AGENT_ENV_FILE:-/etc/sekimore-agent/env}
+if [ -z "${SEKIMORE_TOKEN:-}" ] && [ -r "$ENV_FILE" ]; then
+  set -a
+  # shellcheck disable=SC1090
+  . "$ENV_FILE"
+  set +a
+fi
+exec /usr/local/bin/sekimore-relay agent "$@"

@@ -32,7 +32,12 @@ sekimore-gw (セキュリティゲートウェイ) を経由するネットワ�
 - Claude Code CLI
 - AWS CLI v2
 - Docker CE + buildx + compose plugin
-- `sekimore-gw` agent-setup script (`/usr/local/bin/sekimore-agent-setup.sh`)
+- `sekimore-gw` agent-setup script (`/usr/local/bin/sekimore-agent-setup.sh`) と
+  `sekimore-relay` CLI (`/usr/local/bin/sekimore-relay`)、ラッパー `sekimore`。
+  どちらも **同じ `sekimore-gw` イメージ** (`ARG SEKIMORE_GW_IMAGE`、既定 `ghcr.io/amakata/sekimore-gw:0.1.1`)
+  から `COPY --from` で取るので版がずれない。gateway に relay (git / GitHub API 中継関所) が居れば
+  agent-setup が使い捨て鍵・案件トークン・known_hosts・署名鍵を自動で用意する
+  (`examples/sgw-sample/.devcontainer/docker-compose.relay.yml` 参照)
 - デフォルト zsh rc.d スニペット (`/etc/skel/zsh-rc.d/`)
   XDG 設定、mise activate、エイリアス、プラグイン設定を含む。
   post-create で `~/.config/zsh/rc.d/` にコピーして使う
@@ -76,6 +81,16 @@ GitHub Actions (`.github/workflows/build-and-push.yml`) が次のタグで GHCR 
 | `v1.2.3` タグ push | `1.2.3`, `1.2`, `1`, `sha-<short>` |
 | PR | (push しない、ビルドのみ) |
 
+## sekimore-gw との版の組合せ
+
+| このイメージ | 取り込む sekimore-gw | 備考 |
+| --- | --- | --- |
+| main 以降 | `0.1.1` (`ARG SEKIMORE_GW_IMAGE`) | relay 同梱。`--build-arg SEKIMORE_GW_IMAGE=...` で差し替え可 |
+
+更新順序: sekimore-gw をタグ → GHCR 公開 → このリポジトリの `SEKIMORE_GW_IMAGE` 既定を上げて push →
+GHCR 公開 → `examples/sgw-sample` の compose の image tag を追従。base はバイナリを gateway イメージから取るため、
+順序を飛ばせない。ビルドには `ghcr.io` と `pkg-containers.githubusercontent.com` への到達が必要。
+
 ## Local build
 
 ```sh
@@ -90,6 +105,8 @@ docker buildx build \
 ```sh
 docker build -t sgw-devcontainer-base:dev .
 docker run --rm -it sgw-devcontainer-base:dev zsh
+# ローカルでビルドした sekimore-gw イメージから relay を取る場合
+docker build -t sgw-devcontainer-base:dev --build-arg SEKIMORE_GW_IMAGE=sekimore-gw:relay-dev .
 ```
 
 ## License
