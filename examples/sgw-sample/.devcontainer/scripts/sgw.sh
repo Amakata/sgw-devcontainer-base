@@ -72,7 +72,8 @@ case "${1:-}" in
     echo "after:   $(docker inspect -f "{{.Image}}" "$new")"
     printf "waiting for the gateway"
     for _ in $(seq 1 30); do
-      if docker exec "$new" curl -sS -m 3 -o /dev/null http://127.0.0.1:8080/api/config 2>/dev/null; then echo " ok"; break; fi
+      # gateway に curl は無いので python で叩く (必ず入っている)
+      if docker exec "$new" python -c "import urllib.request,sys; urllib.request.urlopen(\"http://127.0.0.1:8080/api/config\",timeout=3)" 2>/dev/null; then echo " ok"; break; fi
       printf "."; sleep 1
     done
     echo "done. reload the Web UI Relay tab (or run: mise run gw:check)" ;;
