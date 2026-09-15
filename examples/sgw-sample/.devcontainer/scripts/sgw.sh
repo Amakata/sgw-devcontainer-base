@@ -69,18 +69,21 @@ case "${1:-}" in
     wd=$(docker inspect -f "{{index .Config.Labels \"com.docker.compose.project.working_dir\"}}" "$cid")
     cfgs=$(docker inspect -f "{{index .Config.Labels \"com.docker.compose.project.config_files\"}}" "$cid")
     envfile=$(docker inspect -f "{{index .Config.Labels \"com.docker.compose.project.environment_file\"}}" "$cid")
+    # compose ファイルを組む。config_files ラベルがあればそれを使うが、過去に overlay 抜きで作り直された
+    # コンテナはラベルにも overlay が残っていない。そこで relay 構成 (docker-compose.relay.yml が存在する) なら
+    # そのファイルを必ず含める。二重指定にならないよう既出はスキップする。
     fargs=""
+    add_f() { case " $fargs " in *" -f $1 "*) ;; *) [ -f "$1" ] && fargs="$fargs -f $1" ;; esac; }
     if [ -n "$cfgs" ]; then
-      # config_files は "," 区切り (絶対パス or project dir 相対)
       OLDIFS=$IFS; IFS=","
       for c in $cfgs; do
-        case "$c" in /*) fargs="$fargs -f $c" ;; *) fargs="$fargs -f $wd/$c" ;; esac
+        case "$c" in /*) add_f "$c" ;; *) add_f "$wd/$c" ;; esac
       done
       IFS=$OLDIFS
-    else
-      # フォールバック: 既知の 2 ファイル
-      fargs="-f $wd/docker-compose.yml -f $wd/docker-compose.relay.yml"
     fi
+    [ -z "$fargs" ] && add_f "$wd/docker-compose.yml"
+    # relay overlay は agent socket のマウントを持つ。存在すれば必ず重ねる (ラベルから欠けていても)
+    add_f "$wd/docker-compose.relay.yml"
     [ -n "$envfile" ] && [ -f "$envfile" ] && fargs="$fargs --env-file $envfile"
     echo "gateway: $image (project=$proj)"
     echo "compose:$fargs"
