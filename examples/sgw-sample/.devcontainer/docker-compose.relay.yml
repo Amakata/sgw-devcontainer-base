@@ -31,6 +31,8 @@ services:
       - SEKIMORE_BOOTSTRAP=${SEKIMORE_BOOTSTRAP:-auto}
       # 1 なら post-create の agent 転送検知を ERROR ではなく警告にする (非推奨。.env で設定)
       - SEKIMORE_ALLOW_AGENT_FORWARD=${SEKIMORE_ALLOW_AGENT_FORWARD:-0}
+      # 1 なら HTTPS git の credential helper (依頼者の GitHub 認証をホストから借りる経路) を残す (非推奨)
+      - SEKIMORE_ALLOW_CREDENTIAL_HELPER=${SEKIMORE_ALLOW_CREDENTIAL_HELPER:-0}
       # 署名鍵のコメント (GitHub に Signing Key として登録するときの Title)。既定は "sekimore-agent-signing: <案件名> / <git user.name> <user.email>"
       - SEKIMORE_PROJECT=${SEKIMORE_PROJECT:-sgw-sample}
       - SEKIMORE_SIGNING_KEY_COMMENT=${SEKIMORE_SIGNING_KEY_COMMENT:-}

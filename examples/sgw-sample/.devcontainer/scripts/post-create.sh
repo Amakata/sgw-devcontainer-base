@@ -97,4 +97,34 @@ if ssh-add -l >/dev/null 2>&1; then
   fi
 fi
 
+# ---------------------------------------------------------------------------
+# sekimore-relay guardrail (その 2): HTTPS git が依頼者の GitHub 認証を借りる経路を塞ぐ。
+# VS Code Dev Containers 拡張は 2 つの経路を仕込む:
+#   (a) git の credential.helper を /etc/gitconfig と ~/.gitconfig に書く
+#   (b) GIT_ASKPASS + VSCODE_GIT_IPC_HANDLE を各シェルの環境に注入する (git の HTTP Basic 認証で使う)
+# どちらも https://github.com/... の clone/push を関所を迂回して依頼者の権限で通してしまう。
+# relay 構成では git は関所の SSH 経由に限りたいので両方を無効化する。git@github.com (SSH) は影響なし。
+#   - (a) はここで消す (devcontainer.json では無効化できない。拡張が毎回書くので起動ごとに打ち消す)
+#   - (b) は rc.d/70-sekimore.zsh が GIT_ASKPASS='' にして無力化する (対話シェル)。
+#         非対話の tool 呼び出し向けに、ここで git の core.askpass は空にできないため
+#         (env が勝つ)、helper を消すことと SSH 経路への一本化で守る。
+# 一時的に元へ戻すなら SEKIMORE_ALLOW_CREDENTIAL_HELPER=1。
+# ---------------------------------------------------------------------------
+disable_vscode_credential_helper() {
+  local scope changed=0 cur
+  for scope in system global; do
+    cur=$(git config --"$scope" --get-all credential.helper 2>/dev/null || true)
+    case "$cur" in
+      *vscode-remote-containers*|*vscode-server*)
+        git config --"$scope" --unset-all credential.helper 2>/dev/null || true
+        git config --"$scope" credential.helper "" 2>/dev/null || true
+        changed=1 ;;
+    esac
+  done
+  [ "$changed" = 1 ] && echo "[agent] relay: disabled the VS Code HTTPS git credential helper (git は関所の SSH 経由に。SEKIMORE_ALLOW_CREDENTIAL_HELPER=1 で残せる)"
+}
+if [ "${SEKIMORE_ALLOW_CREDENTIAL_HELPER:-0}" != "1" ]; then
+  disable_vscode_credential_helper
+fi
+
 echo "✅ post-create done. Open a new terminal to pick up zsh settings."
