@@ -60,14 +60,34 @@ case "${1:-}" in
   recreate)
     # gateway を最新イメージで作り直す。docker restart は既存イメージのまま再開するので入れ替わらない。
     # compose の image タグを上げたあとに使う (Web UI の Relay タブが古い等)。
+    # Dev Containers は複数の compose ファイル (docker-compose.yml + docker-compose.relay.yml) を重ねているので、
+    # コンテナのラベル config_files からその全てを -f で渡す。1 つでも欠けると relay overlay (agent socket の
+    # マウント等) が外れて gateway が壊れる。
     cid=$(find_container sekimore-gw)
     image=$(docker inspect -f "{{.Config.Image}}" "$cid")
     proj=$(docker inspect -f "{{index .Config.Labels \"com.docker.compose.project\"}}" "$cid")
     wd=$(docker inspect -f "{{index .Config.Labels \"com.docker.compose.project.working_dir\"}}" "$cid")
+    cfgs=$(docker inspect -f "{{index .Config.Labels \"com.docker.compose.project.config_files\"}}" "$cid")
+    envfile=$(docker inspect -f "{{index .Config.Labels \"com.docker.compose.project.environment_file\"}}" "$cid")
+    fargs=""
+    if [ -n "$cfgs" ]; then
+      # config_files は "," 区切り (絶対パス or project dir 相対)
+      OLDIFS=$IFS; IFS=","
+      for c in $cfgs; do
+        case "$c" in /*) fargs="$fargs -f $c" ;; *) fargs="$fargs -f $wd/$c" ;; esac
+      done
+      IFS=$OLDIFS
+    else
+      # フォールバック: 既知の 2 ファイル
+      fargs="-f $wd/docker-compose.yml -f $wd/docker-compose.relay.yml"
+    fi
+    [ -n "$envfile" ] && [ -f "$envfile" ] && fargs="$fargs --env-file $envfile"
     echo "gateway: $image (project=$proj)"
+    echo "compose:$fargs"
     echo "before:  $(docker inspect -f "{{.Image}}" "$cid")"
     docker pull "$image"
-    docker compose -p "$proj" --project-directory "$wd" up -d --force-recreate sekimore-gw
+    # shellcheck disable=SC2086
+    docker compose -p "$proj" --project-directory "$wd" $fargs up -d --force-recreate sekimore-gw
     new=$(find_container sekimore-gw)
     echo "after:   $(docker inspect -f "{{.Image}}" "$new")"
     printf "waiting for the gateway"
