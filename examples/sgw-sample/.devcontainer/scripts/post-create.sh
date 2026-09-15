@@ -111,13 +111,19 @@ fi
 # 一時的に元へ戻すなら SEKIMORE_ALLOW_CREDENTIAL_HELPER=1。
 # ---------------------------------------------------------------------------
 disable_vscode_credential_helper() {
-  local scope changed=0 cur
+  local scope changed=0 cur sudo_cmd
   for scope in system global; do
     cur=$(git config --"$scope" --get-all credential.helper 2>/dev/null || true)
     case "$cur" in
       *vscode-remote-containers*|*vscode-server*)
-        git config --"$scope" --unset-all credential.helper 2>/dev/null || true
-        git config --"$scope" credential.helper "" 2>/dev/null || true
+        # system スコープ (/etc/gitconfig) は root 所有なので sudo が要る。無ければ諦めるが、
+        # GIT_ASKPASS の無力化 (rc.d) で HTTPS 認証自体は塞がっているので致命的ではない
+        sudo_cmd=""
+        if [ "$scope" = system ] && [ ! -w /etc/gitconfig ]; then
+          command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null && sudo_cmd="sudo"
+        fi
+        $sudo_cmd git config --"$scope" --unset-all credential.helper 2>/dev/null || true
+        $sudo_cmd git config --"$scope" credential.helper "" 2>/dev/null || true
         changed=1 ;;
     esac
   done
