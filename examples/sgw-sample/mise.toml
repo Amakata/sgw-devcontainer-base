@@ -80,6 +80,10 @@ run = 'docker logs -f --tail 100 "$(bash "$SGW" id sekimore-gw)"'
 description = "gateway を再起動 (config.yml の domain_handlers / relay を変えたあと。dev は動いたまま)"
 run = 'docker restart "$(bash "$SGW" id sekimore-gw)"'
 
+[tasks."gw:recreate"]
+description = "gateway を最新イメージで pull して作り直す (compose の image タグを上げたあと。docker restart では入れ替わらない)"
+run = 'bash "$SGW" recreate'
+
 [tasks."gw:shell"]
 description = "gateway のシェル (root)"
 run = 'bash "$SGW" gw bash'

@@ -7,6 +7,7 @@
 #   sgw.sh id   <service>  コンテナ ID を表示
 #   sgw.sh project         compose プロジェクト名を表示 (Dev Containers は "<フォルダ名>_devcontainer")
 #   sgw.sh ps              スタックのコンテナ一覧
+#   sgw.sh recreate        gateway を最新イメージで pull して作り直す (docker restart では入れ替わらない)
 #
 # 探し方: compose のラベル (service 名 + project の working_dir = この .devcontainer)。
 # プロジェクト名はフォルダ名に依存するので名前ではなくラベルで引く。
@@ -56,6 +57,25 @@ case "${1:-}" in
     exec docker exec "$(tty_flag)" -u vscode "$cid" "$@" ;;
   id)
     find_container "${2:?usage: sgw.sh id <service>}"; echo ;;
+  recreate)
+    # gateway を最新イメージで作り直す。docker restart は既存イメージのまま再開するので入れ替わらない。
+    # compose の image タグを上げたあとに使う (Web UI の Relay タブが古い等)。
+    cid=$(find_container sekimore-gw)
+    image=$(docker inspect -f "{{.Config.Image}}" "$cid")
+    proj=$(docker inspect -f "{{index .Config.Labels \"com.docker.compose.project\"}}" "$cid")
+    wd=$(docker inspect -f "{{index .Config.Labels \"com.docker.compose.project.working_dir\"}}" "$cid")
+    echo "gateway: $image (project=$proj)"
+    echo "before:  $(docker inspect -f "{{.Image}}" "$cid")"
+    docker pull "$image"
+    docker compose -p "$proj" --project-directory "$wd" up -d --force-recreate sekimore-gw
+    new=$(find_container sekimore-gw)
+    echo "after:   $(docker inspect -f "{{.Image}}" "$new")"
+    printf "waiting for the gateway"
+    for _ in $(seq 1 30); do
+      if docker exec "$new" curl -sS -m 3 -o /dev/null http://127.0.0.1:8080/api/config 2>/dev/null; then echo " ok"; break; fi
+      printf "."; sleep 1
+    done
+    echo "done. reload the Web UI Relay tab (or run: mise run gw:check)" ;;
   project)
     cid=$(find_container sekimore-gw)
     docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' "$cid" ;;
