@@ -63,15 +63,68 @@ fi
 
 sed -i 's/^plugins=(git)$/plugins=(git zsh-completions zsh-autosuggestions zsh-syntax-highlighting fast-syntax-highlighting)/' "$HOME/.zshrc"
 
+
 # ---------------------------------------------------------------------------
-# sekimore-relay guardrail: the operator's ssh-agent must NOT reach this sandbox.
-# With the relay, git authenticates upstream from inside sekimore-gw; if an agent is
-# visible here the key-propagation inversion is broken (see design D-6).
+# sekimore-relay guardrail: 操作者 (人間) の SSH 鍵 = ssh-agent は、この AI 用コンテナから使えてはいけない。
+# relay 構成では GitHub への認証は sekimore-gw の中で行う。ここで ssh-agent が見えるなら鍵伝搬の反転が
+# 成立していないので、エラーで止めて Mac 側の手順を案内する (design D-6)。
+# VS Code Dev Containers 拡張は、VS Code 本体が ssh-agent を使える状態だと必ずコンテナへ転送する
+# (止める設定なし: microsoft/vscode-remote-release#11413)。
 # ---------------------------------------------------------------------------
 if ssh-add -l >/dev/null 2>&1; then
-  echo "⚠️  WARNING: an ssh-agent with identities is reachable inside the dev container (SSH_AUTH_SOCK=${SSH_AUTH_SOCK:-unset})."
-  echo "    The operator's keys are exposed to the AI. Disable agent forwarding for this connection"
-  echo "    (Remote-SSH: remote.SSH.enableAgentForwarding=false, then 'Kill VS Code Server on Host')."
+  if [ "${SEKIMORE_ALLOW_AGENT_FORWARD:-0}" = "1" ]; then
+    echo "⚠️  あなたの Mac の SSH 鍵 (ssh-agent) がこのコンテナから使える状態です。SEKIMORE_ALLOW_AGENT_FORWARD=1 のため続行しますが、AI があなたの鍵を使えます。"
+  else
+    {
+      echo ""
+      echo "❌ 起動を中止しました: あなたの Mac の SSH 鍵 (ssh-agent) が、この開発コンテナから使える状態になっています。"
+      echo "   この構成では、コンテナ内の AI にあなたの鍵を使わせません。GitHub への認証は sekimore-gw が代わりに行います。"
+      echo ""
+      echo "   直し方 (Mac 側で、この順に):"
+      echo "     1. VS Code を Cmd+Q で完全に終了する"
+      echo "     2. Terminal.app で実行する (VS Code の中のターミナルは不可):"
+      echo "          cd <このプロジェクトのフォルダ> && mise run vscode"
+      echo "        → VS Code が「SSH 鍵を使えない状態」で起動します"
+      echo "     3. その VS Code で「Dev Containers: Reopen in Container」を実行する"
+      echo "     4. 確認: コンテナ内で ssh-add -l が失敗 (Could not open a connection to your authentication agent) すれば OK"
+      echo ""
+      echo "   なぜ: VS Code の Dev Containers 拡張は、VS Code 自身が SSH 鍵を使える状態だとコンテナへ必ず転送します (止める設定なし)。"
+      echo "        mise run vscode は VS Code だけに SSH 鍵を見せずに起動します。Docker Desktop (sekimore-gw に鍵を渡す側) には影響しません。"
+      echo "   一時的に無視して起動したい場合: .devcontainer/.env に SEKIMORE_ALLOW_AGENT_FORWARD=1 を書いて Rebuild (非推奨)"
+      echo ""
+    } >&2
+    exit 1
+  fi
+fi
+
+# ---------------------------------------------------------------------------
+# sekimore-relay guardrail (その 2): HTTPS git が依頼者の GitHub 認証を借りる経路を塞ぐ。
+# VS Code Dev Containers 拡張は 2 つの経路を仕込む:
+#   (a) git の credential.helper を /etc/gitconfig と ~/.gitconfig に書く
+#   (b) GIT_ASKPASS + VSCODE_GIT_IPC_HANDLE を各シェルの環境に注入する (git の HTTP Basic 認証で使う)
+# どちらも https://github.com/... の clone/push を関所を迂回して依頼者の権限で通してしまう。
+# relay 構成では git は関所の SSH 経由に限りたいので両方を無効化する。git@github.com (SSH) は影響なし。
+#   - (a) はここで消す (devcontainer.json では無効化できない。拡張が毎回書くので起動ごとに打ち消す)
+#   - (b) は rc.d/70-sekimore.zsh が GIT_ASKPASS='' にして無力化する (対話シェル)。
+#         非対話の tool 呼び出し向けに、ここで git の core.askpass は空にできないため
+#         (env が勝つ)、helper を消すことと SSH 経路への一本化で守る。
+# 一時的に元へ戻すなら SEKIMORE_ALLOW_CREDENTIAL_HELPER=1。
+# ---------------------------------------------------------------------------
+disable_vscode_credential_helper() {
+  local scope changed=0 cur
+  for scope in system global; do
+    cur=$(git config --"$scope" --get-all credential.helper 2>/dev/null || true)
+    case "$cur" in
+      *vscode-remote-containers*|*vscode-server*)
+        git config --"$scope" --unset-all credential.helper 2>/dev/null || true
+        git config --"$scope" credential.helper "" 2>/dev/null || true
+        changed=1 ;;
+    esac
+  done
+  [ "$changed" = 1 ] && echo "[agent] relay: disabled the VS Code HTTPS git credential helper (git は関所の SSH 経由に。SEKIMORE_ALLOW_CREDENTIAL_HELPER=1 で残せる)"
+}
+if [ "${SEKIMORE_ALLOW_CREDENTIAL_HELPER:-0}" != "1" ]; then
+  disable_vscode_credential_helper
 fi
 
 echo "✅ post-create done. Open a new terminal to pick up zsh settings."

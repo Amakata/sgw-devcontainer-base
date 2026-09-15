@@ -1,0 +1,130 @@
+# Mac (Docker Desktop) 側の日常操作を `mise run <task>` にまとめる。一覧は `mise tasks`。
+# gw:* / dev:* / relay:* はホスト側専用 (devcontainer の中の Docker には gateway が居ないので、中では拒否する)。
+#
+#   mise run vscode          # SSH_AUTH_SOCK を渡さずに VS Code を開く (依頼者の鍵を AI に見せない。VS Code は先に完全終了)
+#   mise run gw:login        # gateway の relay を GitHub に device flow でログイン (初回のみ)
+#   mise run gw:check        # relay の状態 (ssh-agent / known_hosts / 上流トークン / 登録鍵)
+#   mise run relay:verify    # 一式の受け入れ確認
+#   mise run gw -- <args>    # 任意の sekimore-relay サブコマンド
+
+[env]
+SGW = "{{config_root}}/.devcontainer/scripts/sgw.sh"
+
+# ---- 起動 ----
+[tasks.vscode]
+description = "VS Code を SSH_AUTH_SOCK が届かない状態で起動する (launchd の変数を外し、open を通さず直接起動、起動後に本体の環境を確認)"
+run = 'bash "$MISE_PROJECT_ROOT/.devcontainer/scripts/vscode.sh"'
+
+[tasks."vscode:check"]
+description = "launchd / Docker Desktop / 起動中の VS Code の SSH_AUTH_SOCK の状態を表示する"
+run = 'bash "$MISE_PROJECT_ROOT/.devcontainer/scripts/vscode.sh" --check'
+
+[tasks."vscode:restore-agent-env"]
+description = "launchd に SSH_AUTH_SOCK を戻す (mise run vscode が外したもの。Docker Desktop を再起動する前に実行)"
+run = 'bash "$MISE_PROJECT_ROOT/.devcontainer/scripts/vscode.sh" --restore-agent-env'
+
+[tasks.web]
+description = "sekimore-gw の Web UI をブラウザで開く"
+run = 'open "http://localhost:8080" 2>/dev/null || xdg-open "http://localhost:8080"'
+
+[tasks.ps]
+description = "この devcontainer の compose スタックのコンテナ一覧"
+run = 'bash "$SGW" ps'
+
+[tasks.down]
+description = "compose スタックを停止・削除する (volume は残る。VS Code を閉じた後の後片付け)"
+run = 'docker compose -p "$(bash "$SGW" project)" down'
+
+# ---- gateway (sekimore-gw) の relay 操作 ----
+[tasks.gw]
+description = "gateway で sekimore-relay <args> を実行 (例: mise run gw -- revoke --label skm_xxxxxxxx)"
+run = 'bash "$SGW" gw sekimore-relay'
+
+[tasks."gw:login"]
+description = "GitHub に device flow でログイン (上流トークンと known_hosts を /data/relay に保存。初回のみ)"
+run = 'bash "$SGW" gw sekimore-relay login'
+
+[tasks."gw:logout"]
+description = "上流トークンを削除"
+run = 'bash "$SGW" gw sekimore-relay logout'
+
+[tasks."gw:whoami"]
+description = "gateway がどの GitHub identity として動くか"
+run = 'bash "$SGW" gw sekimore-relay whoami'
+
+[tasks."gw:check"]
+description = "relay の設定と状態 (ssh-agent / known_hosts / 上流トークン / 登録鍵 / トークン数)"
+run = 'bash "$SGW" gw sekimore-relay check'
+
+[tasks."gw:tokens"]
+description = "発行済み案件トークンの一覧 (ラベル / 期限 / 使用回数 / 状態)"
+run = 'bash "$SGW" gw sekimore-relay tokens'
+
+[tasks."gw:revoke-project"]
+description = "案件の全トークンを失効 (案件終了時)"
+run = 'bash "$SGW" gw sekimore-relay revoke-project'
+
+[tasks."gw:bootstrap"]
+description = "自動登録の kill-switch: mise run gw:bootstrap -- disable|enable|status"
+run = 'bash "$SGW" gw sekimore-relay bootstrap'
+
+[tasks."gw:audit"]
+description = "relay の監査ログを追う (全ての拒否と操作。Ctrl-C で終了)"
+run = 'bash "$SGW" gw tail -n 50 -f /data/relay/audit.jsonl'
+
+[tasks."gw:logs"]
+description = "gateway のコンテナログを追う"
+run = 'docker logs -f --tail 100 "$(bash "$SGW" id sekimore-gw)"'
+
+[tasks."gw:restart"]
+description = "gateway を再起動 (config.yml の domain_handlers / relay を変えたあと。dev は動いたまま)"
+run = 'docker restart "$(bash "$SGW" id sekimore-gw)"'
+
+[tasks."gw:shell"]
+description = "gateway のシェル (root)"
+run = 'bash "$SGW" gw bash'
+
+# ---- dev (AI のサンドボックス) ----
+[tasks."dev:shell"]
+description = "dev コンテナのシェル (vscode ユーザー)"
+run = 'bash "$SGW" dev zsh'
+
+[tasks."dev:agent-setup"]
+description = "dev で agent-setup を再実行 (relay への鍵登録・トークン・known_hosts を作り直す。冪等)"
+run = 'bash "$SGW" dev sudo /usr/local/bin/sekimore-agent-setup.sh'
+
+[tasks."dev:signing-key"]
+description = "AI の署名用公開鍵を表示 (GitHub の Settings → SSH and GPG keys に Signing Key として登録する)"
+run = 'bash "$SGW" dev cat /home/vscode/.ssh/sekimore/signing_ed25519.pub'
+
+# ---- 受け入れ確認 ----
+[tasks."relay:verify"]
+description = "relay の受け入れ確認: gateway の状態 / dev に依頼者の agent が届いていないこと / dev から関所経由の git"
+run = '''
+set -u
+fail=0
+echo "== gateway: sekimore-relay check"
+bash "$SGW" gw sekimore-relay check | sed -n '/^state:/,$p'
+echo
+echo "== dev: the operator's ssh-agent must NOT be reachable"
+if bash "$SGW" dev ssh-add -l >/dev/null 2>&1; then
+  echo "❌ FAIL: ssh-add -l succeeded inside dev — the operator's keys are exposed to the AI. Reopen with: mise run vscode"
+  fail=1
+else
+  echo "OK: no ssh-agent in dev"
+fi
+echo
+echo "== dev: relay token (sekimore whoami)"
+bash "$SGW" dev sekimore whoami || fail=1
+echo
+echo "== dev: git ls-remote through the relay (first repo of the project)"
+bash "$SGW" dev sh -c '. /etc/sekimore-agent/env && git ls-remote "git@$SEKIMORE_GIT_DOMAIN:$SEKIMORE_REPO.git" HEAD' || fail=1
+echo "== dev: a repository outside the project must be denied"
+if bash "$SGW" dev sh -c '. /etc/sekimore-agent/env && git ls-remote "git@$SEKIMORE_GIT_DOMAIN:sekimore-test/not-in-project.git" HEAD' 2>&1 | grep -q "not in project"; then
+  echo "OK: denied"
+else
+  echo "❌ FAIL: no 'not in project' denial"; fail=1
+fi
+echo
+[ "$fail" -eq 0 ] && echo "relay:verify: all checks passed" || { echo "relay:verify: FAILED"; exit 1; }
+'''

@@ -1,21 +1,25 @@
-# sekimore-relay overlay (git / GitHub API relay inside sekimore-gw).
+# sekimore-relay overlay (git / GitHub API 中継関所。sekimore-gw 0.1.2 以降に同梱)。
 #
-# Listed in devcontainer.json after docker-compose.yml. Remove it there — and the
-# `domain_handlers:` / `relay:` blocks from config/config.yml — to run without the relay.
+# devcontainer.json の dockerComposeFile で docker-compose.yml の後に並べる。
+# relay を使わない場合はそこから外し、config/config.yml の domain_handlers: / relay: を消す。
 #
-# What it does:
-#   * sekimore-gw gets the operator's ssh-agent. Mount the DIRECTORY that holds the
-#     socket (the socket path itself changes per session), see .env.sample.
-#   * dev keeps its disposable relay keys in a volume so they survive rebuilds.
+# 何をするか:
+#   * sekimore-gw に依頼者の ssh-agent を渡す (relay は上流 git にこの agent で認証する。鍵は Mac から出ない)。
+#       - Docker Desktop (Mac): Docker Desktop がホストの agent を VM 内の固定パス
+#         /run/host-services/ssh-auth.sock に転送している。これが既定。
+#         Mac 側で `ssh-add -l` に鍵が出ていること (無ければ `ssh-add --apple-use-keychain ~/.ssh/<key>`)。
+#       - Vagrant VM: 固定パスに socket を用意して SEKIMORE_AGENT_SOCK に書く
+#         (例: Mac から `ssh -N -o StreamLocalBindUnlink=yes -R /home/vagrant/.ssh-agent/agent.sock:$SSH_AUTH_SOCK <vm>`、
+#          SEKIMORE_AGENT_SOCK=/home/vagrant/.ssh-agent/agent.sock)。転送を張り直すと socket の inode が変わり
+#          マウントが古くなるので `docker compose up -d --force-recreate sekimore-gw` が必要。
+#   * dev の使い捨て鍵 (~/.ssh/sekimore) を volume にして再ビルドでも変わらないようにする。
 #
-# Requirement for the whole design: the operator's agent must NOT be forwarded into
-# `dev` (verify with `ssh-add -l` inside dev — it must fail). See
-# doc/sgw-devcontainer-base/design/sekimore-relay-agent.md (D-6) for how to stop the
-# Dev Containers extension's implicit forwarding.
+# 前提: 依頼者の agent が dev に転送されていないこと (dev 内で `ssh-add -l` が失敗すること)。
+# Dev Containers 拡張の暗黙転送の止め方は doc/sgw-devcontainer-base/design/sekimore-relay-agent.md D-6。
 services:
   sekimore-gw:
     volumes:
-      - ${SEKIMORE_AGENT_SOCK_DIR:?set SEKIMORE_AGENT_SOCK_DIR in .env to the VM directory that contains agent.sock}:/ssh-agent:ro
+      - ${SEKIMORE_AGENT_SOCK:-/run/host-services/ssh-auth.sock}:/ssh-agent/agent.sock:ro
     environment:
       - SSH_AUTH_SOCK=/ssh-agent/agent.sock
 
@@ -23,8 +27,15 @@ services:
     volumes:
       - sekimore-agent-keys:/home/vscode/.ssh/sekimore
     environment:
-      # Optional knobs read by sekimore-agent-setup.sh (defaults shown)
+      # sekimore-agent-setup.sh が読む (auto: 鍵登録とトークン取得を自動化 / manual: 操作者が add-key と token を行う)
       - SEKIMORE_BOOTSTRAP=${SEKIMORE_BOOTSTRAP:-auto}
+      # 1 なら post-create の agent 転送検知を ERROR ではなく警告にする (非推奨。.env で設定)
+      - SEKIMORE_ALLOW_AGENT_FORWARD=${SEKIMORE_ALLOW_AGENT_FORWARD:-0}
+      # 1 なら HTTPS git の credential helper (依頼者の GitHub 認証をホストから借りる経路) を残す (非推奨)
+      - SEKIMORE_ALLOW_CREDENTIAL_HELPER=${SEKIMORE_ALLOW_CREDENTIAL_HELPER:-0}
+      # 署名鍵のコメント (GitHub に Signing Key として登録するときの Title)。既定は "sekimore-agent-signing: <案件名> / <git user.name> <user.email>"
+      - SEKIMORE_PROJECT=${SEKIMORE_PROJECT:-sgw-sample}
+      - SEKIMORE_SIGNING_KEY_COMMENT=${SEKIMORE_SIGNING_KEY_COMMENT:-}
 
 volumes:
   sekimore-agent-keys:

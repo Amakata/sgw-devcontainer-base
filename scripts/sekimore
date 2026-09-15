@@ -2,18 +2,71 @@
 # sekimore — agent-side CLI for the sekimore-relay (git / GitHub API gateway).
 #
 # Loads the project token and endpoint that sekimore-agent-setup.sh wrote to
-# /etc/sekimore-agent/env (unless already in the environment), then runs
-# `sekimore-relay agent "$@"`. Works from any process, not only interactive
-# shells (Claude Code tool calls, `docker exec`, scripts).
+# /etc/sekimore-agent/env, then runs `sekimore-relay agent "$@"`. Works from any
+# process, not only interactive shells (Claude Code tool calls, `docker exec`, scripts).
+#
+# The env file wins over variables already in the environment: shells started before a
+# token refresh still carry the old SEKIMORE_TOKEN, and the file is the source of truth.
+# Set SEKIMORE_ENV_OVERRIDE=1 to use the environment as-is (manual testing).
+#
+# Token refresh: project tokens have a TTL (relay.token_ttl, default 12h). When the
+# token in the env file is expired (SEKIMORE_TOKEN_EXPIRES) or the relay rejects it,
+# the wrapper re-runs bootstrap with the disposable key (SEKIMORE_AGENT_KEY) and rewrites
+# the env file (owned by the agent user, 0600), then retries once. The gateway revokes
+# the previous token of the same key, so there is one live token per key.
 #
 #   sekimore whoami
 #   sekimore pr create --head sekimore/main-abc1234 --base main --title T
 #   sekimore issue create --title T [--labels a,b]
 ENV_FILE=${SEKIMORE_AGENT_ENV_FILE:-/etc/sekimore-agent/env}
-if [ -z "${SEKIMORE_TOKEN:-}" ] && [ -r "$ENV_FILE" ]; then
-  set -a
-  # shellcheck disable=SC1090
-  . "$ENV_FILE"
-  set +a
+BIN=/usr/local/bin/sekimore-relay
+
+load_env() {
+  if [ "${SEKIMORE_ENV_OVERRIDE:-0}" != "1" ] && [ -r "$ENV_FILE" ]; then
+    set -a
+    # shellcheck disable=SC1090
+    . "$ENV_FILE"
+    set +a
+  fi
+}
+
+# 期限が env にあり過去なら 0
+token_expired() {
+  [ -n "${SEKIMORE_TOKEN_EXPIRES:-}" ] || return 1
+  exp=$(date -u -d "$SEKIMORE_TOKEN_EXPIRES" +%s 2>/dev/null) || return 1
+  now=$(date -u +%s)
+  [ "$now" -ge "$exp" ]
+}
+
+# bootstrap をやり直して env ファイルを書き換える。成功なら 0
+refresh_token() {
+  key=${SEKIMORE_AGENT_KEY:-$HOME/.ssh/sekimore/id_ed25519.pub}
+  [ -r "$key" ] && [ -n "${SEKIMORE_ENDPOINT:-}" ] && [ -w "$ENV_FILE" ] || return 1
+  resp=$("$BIN" agent bootstrap --pubkey-file "$key" 2>/dev/null) || return 1
+  new=$(printf '%s' "$resp" | grep -o 'skm_[0-9a-f]\{64\}' | head -1)
+  [ -n "$new" ] || return 1
+  exp=$(printf '%s' "$resp" | grep -o '"token_expires":"[^"]*"' | cut -d'"' -f4)
+  tmp="$ENV_FILE.tmp.$$"
+  {
+    grep -v '^SEKIMORE_TOKEN=\|^SEKIMORE_TOKEN_EXPIRES=' "$ENV_FILE"
+    echo "SEKIMORE_TOKEN=$new"
+    [ -n "$exp" ] && echo "SEKIMORE_TOKEN_EXPIRES=$exp"
+  } > "$tmp" && chmod 600 "$tmp" && mv -f "$tmp" "$ENV_FILE" || { rm -f "$tmp"; return 1; }
+  echo "sekimore: project token was expired; obtained a new one (expires $exp)" >&2
+  load_env
+}
+
+load_env
+if token_expired && refresh_token; then :; fi
+
+# 実行。トークン起因で失敗したら 1 回だけ更新して再実行する (期限が env に無い古い環境向け)
+"$BIN" agent "$@"
+rc=$?
+if [ "$rc" -ne 0 ] && [ "${1:-}" != "bootstrap" ]; then
+  if "$BIN" agent whoami 2>&1 | grep -q 'token expired\|unknown token\|token revoked'; then
+    if refresh_token; then
+      exec "$BIN" agent "$@"
+    fi
+  fi
 fi
-exec /usr/local/bin/sekimore-relay agent "$@"
+exit "$rc"
