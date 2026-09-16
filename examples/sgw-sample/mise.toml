@@ -68,6 +68,18 @@ run = 'bash "$SGW" gw sekimore-relay revoke-project'
 description = "自動登録の kill-switch: mise run gw:bootstrap -- disable|enable|status"
 run = 'bash "$SGW" gw sekimore-relay bootstrap'
 
+[tasks."gw:db-stats"]
+description = "gateway のログ DB (DNS / firewall / proxy) の件数・期間・サイズ・索引 (gw 0.2.3〜)"
+run = 'bash "$SGW" gw python -m src.maint db-stats'
+
+[tasks."gw:db-prune"]
+description = "N 日より古いログを削除 (記録は既定で残すので明示的に): mise run gw:db-prune -- --before-days 90 --yes [--vacuum]"
+run = 'bash "$SGW" gw python -m src.maint db-prune'
+
+[tasks."gw:db-reset"]
+description = "ログ DB を空にして VACUUM (relay の監査は別ファイル): mise run gw:db-reset -- --yes"
+run = 'bash "$SGW" gw python -m src.maint db-reset'
+
 [tasks."gw:audit"]
 description = "relay の監査ログを追う (全ての拒否と操作。Ctrl-C で終了)"
 run = 'bash "$SGW" gw tail -n 50 -f /data/relay/audit.jsonl'
