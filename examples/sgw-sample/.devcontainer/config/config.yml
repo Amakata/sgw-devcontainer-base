@@ -77,7 +77,7 @@ database_path: "/data/security_gateway.db"
 # from devcontainer.json) to run without the relay.
 domain_handlers:
   github.com:
-    handler: git-relay          # exact FQDN, only one git-relay entry
+    handler: git-relay          # exact FQDN. More upstreams (e.g. GHES) need their own ssh_port (gw 0.2.0+)
 relay:
   https: passthrough            # HTTPS to github.com is forwarded unchanged (reject = drop with a log line)
   bootstrap: auto               # dev registers its disposable key and gets a project token automatically
