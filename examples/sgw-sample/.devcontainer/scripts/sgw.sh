@@ -91,13 +91,18 @@ case "${1:-}" in
     # コンテナのラベル config_files からその全てを -f で渡す。1 つでも欠けると relay overlay (agent socket の
     # マウント等) が外れて gateway が壊れる。
     cid=$(find_container sekimore-gw)
-    image=$(docker inspect -f "{{.Config.Image}}" "$cid")
+    running=$(docker inspect -f "{{.Config.Image}}" "$cid")
     proj=$(docker inspect -f "{{index .Config.Labels \"com.docker.compose.project\"}}" "$cid")
     wd=$(docker inspect -f "{{index .Config.Labels \"com.docker.compose.project.working_dir\"}}" "$cid")
     cfgs=$(docker inspect -f "{{index .Config.Labels \"com.docker.compose.project.config_files\"}}" "$cid")
     envfile=$(docker inspect -f "{{index .Config.Labels \"com.docker.compose.project.environment_file\"}}" "$cid")
     compose_args "$wd" "$cfgs" "$envfile"
-    echo "gateway: $image (project=$proj)"
+    # pull するのは compose が宣言している image (タグを上げた直後は実行中コンテナの image より新しい)。
+    # compose up は既にあるタグを再 pull しないので、同じタグの更新 (latest 等) もここで取り込む。
+    # compose config が使えない環境では実行中コンテナの image に戻る
+    image=$(docker compose -p "$proj" --project-directory "$wd" "${FARGS[@]}" config --images sekimore-gw 2>/dev/null | head -1)
+    image=${image:-$running}
+    if [ "$image" != "$running" ]; then echo "gateway: $running → $image (project=$proj)"; else echo "gateway: $image (project=$proj)"; fi
     printf 'compose:'; printf ' %q' "${FARGS[@]}"; echo
     echo "before:  $(docker inspect -f "{{.Image}}" "$cid")"
     docker pull "$image"
