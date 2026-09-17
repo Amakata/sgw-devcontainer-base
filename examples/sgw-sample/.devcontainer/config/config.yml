@@ -101,5 +101,8 @@ relay:
       # - release:create      # sekimore release create (gw 0.2.6+; push the tag first)
       # - release:read
       # - pr:request_review   # sekimore pr request-review (gw 0.2.7+)
+      # - pr:read             # sekimore pr view / comments / list (gw 0.2.8+)
+      # - issue:read          # sekimore issue view / comments / list (gw 0.2.8+)
+      # - search:read         # sekimore search (gw 0.2.8+)
     # boards:                 # gw 0.2.7+: required before any project:* call. Written as the URL reads
     #   - { org: acme, number: 3 }      # github.com/orgs/acme/projects/3
