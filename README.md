@@ -34,7 +34,7 @@ sekimore-gw (セキュリティゲートウェイ) を経由するネットワ�
 - Docker CE + buildx + compose plugin
 - `sekimore-gw` agent-setup script (`/usr/local/bin/sekimore-agent-setup.sh`) と
   `sekimore-relay` CLI (`/usr/local/bin/sekimore-relay`)、ラッパー `sekimore`。
-  どちらも **同じ `sekimore-gw` イメージ** (`ARG SEKIMORE_GW_IMAGE`、既定 `ghcr.io/amakata/sekimore-gw:0.2.10`)
+  どちらも **同じ `sekimore-gw` イメージ** (`ARG SEKIMORE_GW_IMAGE`、既定 `ghcr.io/amakata/sekimore-gw:0.2.11`)
   から `COPY --from` で取るので版がずれない。gateway に relay (git / GitHub API 中継関所) が居れば
   agent-setup が使い捨て鍵・案件トークン・known_hosts・署名鍵を自動で用意する
   (`examples/sgw-sample/.devcontainer/docker-compose.relay.yml` 参照)
@@ -86,7 +86,8 @@ GitHub Actions (`.github/workflows/build-and-push.yml`) が次のタグで GHCR 
 
 | このイメージ | 取り込む sekimore-gw | 備考 |
 | --- | --- | --- |
-| 0.2.11 以降 | `0.2.10` (`ARG SEKIMORE_GW_IMAGE`) | 死蔵コードの削除、効いていなかった環境変数の修正、`login` 失敗時にプロキシ経由かを示す。`--build-arg SEKIMORE_GW_IMAGE=...` で差し替え可 |
+| 0.2.12 以降 | `0.2.11` (`ARG SEKIMORE_GW_IMAGE`) | 内部構造の整理のみ (CLI とハンドラの分割)。挙動の変更なし。`--build-arg SEKIMORE_GW_IMAGE=...` で差し替え可 |
+| 0.2.11 | `0.2.10` | 死蔵コードの削除、効いていなかった環境変数の修正、`login` 失敗時にプロキシ経由かを示す。`--build-arg SEKIMORE_GW_IMAGE=...` で差し替え可 |
 | 0.2.10 | `0.2.9` | merge オプション、reopen、`release edit`、`ci rerun`、`repo vocabulary`。`--build-arg SEKIMORE_GW_IMAGE=...` で差し替え可 |
 | 0.2.9 | `0.2.8` | PR / Issue の読み取り (`pr view` / `pr comments` / `issue view` ほか) と案件横断の `sekimore search`。`--build-arg SEKIMORE_GW_IMAGE=...` で差し替え可 |
 | 0.2.8 | `0.2.7` | セキュリティ修正 (タグ / ref のパス traversal、Projects のボード限定)。`sekimore pr request-review`、`sekimore project fields`。`--build-arg SEKIMORE_GW_IMAGE=...` で差し替え可 |
