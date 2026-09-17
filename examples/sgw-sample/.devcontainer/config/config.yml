@@ -100,3 +100,6 @@ relay:
       - issue:comment
       # - release:create      # sekimore release create (gw 0.2.6+; push the tag first)
       # - release:read
+      # - pr:request_review   # sekimore pr request-review (gw 0.2.7+)
+    # boards:                 # gw 0.2.7+: required before any project:* call. Written as the URL reads
+    #   - { org: acme, number: 3 }      # github.com/orgs/acme/projects/3
