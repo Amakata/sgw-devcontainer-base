@@ -15,6 +15,7 @@ allow_domains:
   - deb.debian.org
   # github
   - github.com
+  - codeload.github.com                  # where github.com/<org>/<repo>/archive/... redirects: source tarballs
   - api.github.com
   - raw.githubusercontent.com
   - release-assets.githubusercontent.com
@@ -80,6 +81,14 @@ database_path: "/data/security_gateway.db"
 # (DNS points github.com at the gateway), checked against this project policy and
 # forwarded upstream with the operator's ssh-agent. Remove this block (and the overlay
 # from devcontainer.json) to run without the relay.
+# When a change to this file takes effect (gw 0.2.13+). The file is writable from the dev
+# container and `auto` applies it on save, so an agent that has read a hostile prompt can
+# rewrite the rules holding it. A duration opens the window for that long after start-up and
+# then shuts on its own; reopen it while debugging with, on the docker host:
+#   docker compose exec sekimore-gw python -m src.maint reload-follow 30m
+#   docker compose exec sekimore-gw python -m src.maint reload-freeze   # before starting an agent
+reload: 30m                     # auto (apply on save) | manual | a duration
+
 domain_handlers:
   github.com:
     handler: github          # exact FQDN. More upstreams (e.g. GHES) need their own ssh_port (gw 0.2.0+)
