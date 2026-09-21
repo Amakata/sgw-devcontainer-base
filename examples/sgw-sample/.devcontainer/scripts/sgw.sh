@@ -78,6 +78,14 @@ case "${1:-}" in
     shift; cid=$(find_container sekimore-gw)
     if [ $# -eq 0 ]; then set -- sekimore-relay check; fi
     exec docker exec "$(tty_flag)" "$cid" "$@" ;;
+  # Always -it, for a command that reads a passphrase. tty_flag asks for stdout as well, and a
+  # task runner that prefixes output makes stdout a pipe — so the detection says "no terminal"
+  # while the person is sitting at one. What matters here is stdin, and asking for a terminal we
+  # do not need costs nothing: docker only refuses -t when stdin itself is not one.
+  gw-tty)
+    shift; cid=$(find_container sekimore-gw)
+    [ -t 0 ] || { echo "sgw.sh: $* needs a terminal on stdin (do not pipe it)" >&2; exit 2; }
+    exec docker exec -it "$cid" "$@" ;;
   dev)
     shift; cid=$(find_container dev)
     if [ $# -eq 0 ]; then set -- zsh; fi
