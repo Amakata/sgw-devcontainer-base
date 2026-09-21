@@ -1,4 +1,4 @@
-<!-- reviewed-up-to: 0.2.26 -->
+<!-- reviewed-up-to: 0.2.27 -->
 # Upgrading (what each release asks of you)
 
 *[日本語版](UPGRADING.ja.md)*
@@ -29,6 +29,7 @@ is the whole upgrade. What changed is in the changelogs —
 | 0.2.7 – 0.2.14 | [0.2.15](#0215-a-secret-store-appeared) onward |
 | 0.2.15 – 0.2.18 | [0.2.19](#0219-unlocking-became-required) |
 | 0.2.19 – 0.2.21 | [0.2.22](#0222-the-proxy-credential-moved-into-the-store) — **only if your upstream proxy needs a password** |
+| 0.2.22 – 0.2.26 | [0.2.27](#0227-tags-have-to-be-signed) — **only if the agent pushes tags** |
 
 ---
 
@@ -202,3 +203,34 @@ Two things follow from the store being sealed at start-up:
   ([0.2.20](#0220-tasks-come-from-the-gateway-now)) after `mise run gw:sync-tasks`
 
 0.2.21 and 0.2.23 – 0.2.26 ask nothing of you.
+
+## 0.2.27 tags have to be signed
+
+**Only for a project whose `tags:` globs let the agent push tags.** Everyone else:
+nothing to do.
+
+A pushed tag now has to be an annotated tag object carrying a signature —
+`git tag -s`, in any format git knows (OpenPGP, SSH, X.509). A lightweight tag
+(`git tag v1`) and an unsigned annotated one (`git tag -a`) are refused with
+`[remote rejected]` and a message that says why. The relay checks that a
+signature is *present*, not whose it is.
+
+The dev container already signs: `agent-setup.sh` sets `tag.gpgsign true` with
+the agent's SSH signing key, so `git tag -s` and plain `git tag -a` both come out
+signed there. What this catches is a tag made *around* that — `-c
+tag.gpgsign=false`, or from a shell without the setup — which is how the first
+`v0.2.18` of the gateway itself went up.
+
+If you would rather not have the check, it is one line, at whichever layer:
+
+```yaml
+# .devcontainer/config/config.yml
+relay:
+  project:
+    signed_tags: false          # or under upstreams.<domain>, or on one entry of repos[]
+```
+
+Then `mise run gw:recreate`. `mise run gw:check` shows the effective value per
+repository (`signed_tags=true|false`).
+
+0.2.23 – 0.2.26 ask nothing of you.
