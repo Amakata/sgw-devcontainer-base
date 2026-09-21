@@ -22,7 +22,7 @@ DevContainer のベースイメージ — Dockerfile と焼き込む道具、同
 
 ### Enhancement
 
-- gateway 0.2.15 を取り込む。0.2.17 から据え置き (#39)
+- gateway 0.2.29 を取り込む (#40)
 - README.md を英語、README.ja.md を日本語にした。他のリポジトリと同じ形。サンプルの `config.yml` はコメントを英語にし、gateway が読むキーを全部 (権限キー 28 個を含む) 載せた (#39)
 - この変更履歴を英語と日本語で追加した。gateway と relay が既に使っている形に合わせた (#26)
 
