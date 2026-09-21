@@ -129,21 +129,6 @@ COPY scripts/docker-init.sh /usr/local/bin/docker-init.sh
 RUN chmod +x /usr/local/bin/docker-init.sh
 
 # ---------------------------------------------------------------------------
-# sekimore-gw agent-setup script + sekimore-relay CLI
-#
-# Both come from the sekimore-gw image (see the sekimore-gw stage at the top),
-# so the devcontainer can run `sudo /usr/local/bin/sekimore-agent-setup.sh`
-# without a network fetch, and `sekimore` / `sekimore-relay agent ...` talk to
-# the relay with the project token that agent-setup writes to
-# /etc/sekimore-agent/env.
-# ---------------------------------------------------------------------------
-COPY --from=sekimore-gw /usr/local/share/sekimore/agent-setup.sh /usr/local/bin/sekimore-agent-setup.sh
-COPY --from=sekimore-gw /usr/local/bin/sekimore-relay /usr/local/bin/sekimore-relay
-COPY scripts/sekimore /usr/local/bin/sekimore
-RUN chmod +x /usr/local/bin/sekimore-agent-setup.sh /usr/local/bin/sekimore-relay /usr/local/bin/sekimore
-RUN mkdir -p /etc/sekimore-agent
-
-# ---------------------------------------------------------------------------
 # zsh / oh-my-zsh / plugins  (as vscode user)
 # ---------------------------------------------------------------------------
 USER ${USERNAME}
@@ -246,6 +231,27 @@ RUN mise use -g node@lts && npm install -g @openai/codex
 USER root
 COPY zsh-config/rc.d/ /etc/skel/zsh-rc.d/
 RUN chown -R ${USERNAME}:${USERNAME} /etc/skel/zsh-rc.d/
+
+USER root
+# ---------------------------------------------------------------------------
+# sekimore-gw agent-setup script + sekimore-relay CLI
+#
+# Both come from the sekimore-gw image (see the sekimore-gw stage at the top),
+# so the devcontainer can run `sudo /usr/local/bin/sekimore-agent-setup.sh`
+# without a network fetch, and `sekimore` / `sekimore-relay agent ...` talk to
+# the relay with the project token that agent-setup writes to
+# /etc/sekimore-agent/env.
+#
+# Last on purpose. The relay binary changes with every sekimore-gw release and
+# nothing below depends on these three files, so a gateway bump invalidates only
+# these layers — not node, codex, Claude Code or the oh-my-zsh plugins, which is
+# what made every bump a full re-pull.
+# ---------------------------------------------------------------------------
+COPY --from=sekimore-gw /usr/local/share/sekimore/agent-setup.sh /usr/local/bin/sekimore-agent-setup.sh
+COPY --from=sekimore-gw /usr/local/bin/sekimore-relay /usr/local/bin/sekimore-relay
+COPY scripts/sekimore /usr/local/bin/sekimore
+RUN chmod +x /usr/local/bin/sekimore-agent-setup.sh /usr/local/bin/sekimore-relay /usr/local/bin/sekimore
+RUN mkdir -p /etc/sekimore-agent
 
 USER ${USERNAME}
 WORKDIR /workspace
