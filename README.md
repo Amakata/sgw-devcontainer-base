@@ -105,7 +105,9 @@ $EDITOR .devcontainer/config/config.yml             # relay.project.repos と pe
 
 ## 更新のしかた
 
-追いかける版が 3 つある。**独立していないので順に上げる。**
+**版ごとに何をすべきかは [UPGRADING.ja.md](UPGRADING.ja.md) にまとめてある**
+(あなたが持っているファイルを触る必要がある版だけ。ほとんどの版は何も要らない)。
+ここに書くのは、その 3 つの版をどの順で上げるか。**独立していないので順に上げる。**
 
 ```
 sekimore-gw (gateway)  ── このイメージが relay バイナリを取り込む
