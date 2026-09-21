@@ -1,4 +1,4 @@
-<!-- reviewed-up-to: 0.2.20 -->
+<!-- reviewed-up-to: 0.2.26 -->
 # 更新のしかた (版ごとに必要な作業)
 
 *[English](UPGRADING.md)*
@@ -28,6 +28,7 @@
 | 0.1.9 〜 0.2.6 | [0.2.7](#027-projects-のボードを宣言する-破壊的) 以降 |
 | 0.2.7 〜 0.2.14 | [0.2.15](#0215-秘密ストアが増えた) 以降 |
 | 0.2.15 〜 0.2.18 | [0.2.19](#0219-解錠が必須になった) |
+| 0.2.19 〜 0.2.21 | [0.2.22](#0222-proxy-の認証情報がストアに移った) — **上流 proxy にパスワードが要る場合だけ** |
 
 ---
 
@@ -162,3 +163,30 @@ SGW = "{{config_root}}/.devcontainer/scripts/sgw.sh"
 **エラーも警告も出さず黙って無視します**。gitignore すると、clone した人の環境で
 `gw:*` が「静かに存在しない」状態になります。コミットしておけば、ゲートウェイを
 更新したときの差分が `git diff` に出るという利点もあります。
+
+## 0.2.22 proxy の認証情報がストアに移った
+
+**パスワードを求める社内 proxy の背後にある gateway だけ。** それ以外はやることなし。
+
+`config.yml` の `upstream_proxy_username` / `upstream_proxy_password` と、
+環境変数 `SEKIMORE_UPSTREAM_PROXY_*` は dev コンテナから読めます。`config.yml` は
+worktree の中にあり、`.devcontainer/.env` はエージェント自身の `env_file` だからです。
+認証情報の置き場所はシークレットストアです:
+
+```bash
+mise run gw:proxy-credential -- set     # ユーザー名とパスワードは端末で聞かれる
+```
+
+そのあと `config.yml` から2つのキーを、置いていた場所から2つの環境変数を消して、
+`mise run gw:recreate`。残しておいても**引き続き読まれる**ので破壊的変更ではありません。
+穴を閉じるのは消すほうです。
+
+ストアが起動時に封じられていることから、2つ従うことがあります:
+
+- `mise run gw:unlock` までは Squid は上流認証**なし**で動き、ストアが開くと自分で
+  認証情報を拾います。匿名を拒む proxy の背後でも gateway は起動します。unlock より前に
+  proxy を通るものが無いからです
+- `gw:proxy-credential` は gateway のタスクです。`mise run gw:sync-tasks` のあと
+  include（[0.2.20](#0220-タスクが-gateway-から来るようになった)）経由で届きます
+
+0.2.21 と 0.2.23 〜 0.2.26 は何も求めません。
