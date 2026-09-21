@@ -1,4 +1,4 @@
-<!-- reviewed-up-to: 0.2.27 -->
+<!-- reviewed-up-to: 0.2.28 -->
 # 更新のしかた (版ごとに必要な作業)
 
 *[English](UPGRADING.md)*
@@ -30,6 +30,7 @@
 | 0.2.15 〜 0.2.18 | [0.2.19](#0219-解錠が必須になった) |
 | 0.2.19 〜 0.2.21 | [0.2.22](#0222-proxy-の認証情報がストアに移った) — **上流 proxy にパスワードが要る場合だけ** |
 | 0.2.22 〜 0.2.26 | [0.2.27](#0227-タグは署名が必須になった) — **エージェントにタグを push させている場合だけ** |
+| 0.2.27 | [0.2.28](#0228-dependabot-アラートは任意) — **エージェントに Dependabot アラートを読ませたい場合だけ** |
 
 ---
 
@@ -219,3 +220,24 @@ relay:
 （`signed_tags=true|false`）を出します。
 
 0.2.23 〜 0.2.26 は何も求めません。
+
+## 0.2.28 Dependabot アラートは任意
+
+**使いたいときだけ。** 権限キーが 2 つ増えました。`security:read`（リポジトリの Dependabot
+アラートの一覧・詳細）と `security:dismiss`（理由を付けて脇に置く・戻す）。どちらも既存の
+設定では付きません。
+
+使うなら:
+
+```yaml
+# .devcontainer/config/config.yml
+relay:
+  project:
+    permissions:
+      - security:read
+      # - security:dismiss      # 脆弱性を見えなくするのは別の権限。意図して付ける
+```
+
+そのあと `mise run gw:recreate`、**さらに `mise run gw:login` をもう一度**。alerts API には
+`security_events` の OAuth scope が要り、0.2.28 より前の login は要求していません。無いと
+`sekimore security alerts` は GitHub の 403 を受けます。

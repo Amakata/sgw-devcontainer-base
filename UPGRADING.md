@@ -1,4 +1,4 @@
-<!-- reviewed-up-to: 0.2.27 -->
+<!-- reviewed-up-to: 0.2.28 -->
 # Upgrading (what each release asks of you)
 
 *[日本語版](UPGRADING.ja.md)*
@@ -30,6 +30,7 @@ is the whole upgrade. What changed is in the changelogs —
 | 0.2.15 – 0.2.18 | [0.2.19](#0219-unlocking-became-required) |
 | 0.2.19 – 0.2.21 | [0.2.22](#0222-the-proxy-credential-moved-into-the-store) — **only if your upstream proxy needs a password** |
 | 0.2.22 – 0.2.26 | [0.2.27](#0227-tags-have-to-be-signed) — **only if the agent pushes tags** |
+| 0.2.27 | [0.2.28](#0228-dependabot-alerts-are-optional) — **only if you want the agent to read Dependabot alerts** |
 
 ---
 
@@ -234,3 +235,25 @@ Then `mise run gw:recreate`. `mise run gw:check` shows the effective value per
 repository (`signed_tags=true|false`).
 
 0.2.23 – 0.2.26 ask nothing of you.
+
+## 0.2.28 Dependabot alerts are optional
+
+**Nothing to do unless you want them.** Two new permission keys exist,
+`security:read` (list and view the repository's Dependabot alerts) and
+`security:dismiss` (set one aside with a reason, or reopen it). Neither is granted
+by anything you have.
+
+To turn them on:
+
+```yaml
+# .devcontainer/config/config.yml
+relay:
+  project:
+    permissions:
+      - security:read
+      # - security:dismiss      # hiding a vulnerability is a separate authority; grant it deliberately
+```
+
+Then `mise run gw:recreate`, **and `mise run gw:login` once more**: the alerts API
+needs the `security_events` OAuth scope, which logins before 0.2.28 did not ask
+for. Without it `sekimore security alerts` gets GitHub's 403.
