@@ -129,9 +129,18 @@ git の push / pull は SSH なので影響しません。
 **任意。ただし一度やる価値がある。** イメージが `gw:*` タスクを持つようになったので、
 プロジェクト側で複製を抱える必要がなくなりました:
 
+雛形 (`examples/sgw-sample/`) はこの形になっているので、新規はそのまま始まります。
+既存のプロジェクトは `gw:sync-tasks` を足してから一度走らせます:
+
+```toml
+# mise.toml — これだけは自分で持つ。イメージから配れない (取り出す側なので)
+[tasks."gw:sync-tasks"]
+description = "動いているゲートウェイから gw:* タスクを取り出す (gw:recreate のあとに実行する)"
+run = "bash \"$SGW\" gw cat /usr/local/share/sekimore/gateway.mise.ja.toml > \"$MISE_PROJECT_ROOT/.devcontainer/gateway.mise.toml\" && echo wrote"
+```
+
 ```bash
-docker exec sekimore-gw cat /usr/local/share/sekimore/gateway.mise.ja.toml \
-  > .devcontainer/gateway.mise.toml      # .en.toml でもよい。違うのは `mise tasks` の表示だけ
+mise run gw:sync-tasks      # .en.toml でもよい。違うのは `mise tasks` の表示だけ
 ```
 
 ```toml
@@ -148,3 +157,8 @@ SGW = "{{config_root}}/.devcontainer/scripts/sgw.sh"
 
 `sgw.sh` は引き続きあなたのもので、`gw-tty` が要ります。同梱ファイルの冒頭に、
 どの原始的な口を使うか4つ書いてあります。
+
+**取り出したファイルはコミットしてください。** `mise` は include 先が無くても
+**エラーも警告も出さず黙って無視します**。gitignore すると、clone した人の環境で
+`gw:*` が「静かに存在しない」状態になります。コミットしておけば、ゲートウェイを
+更新したときの差分が `git diff` に出るという利点もあります。

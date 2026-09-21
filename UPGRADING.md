@@ -138,9 +138,18 @@ unchanged.
 **Optional, and worth doing once.** The image carries its own `gw:*` tasks, so a
 project can stop keeping a copy:
 
+The sample (`examples/sgw-sample/`) is already in this shape, so a new project
+starts there. An existing one adds `gw:sync-tasks` and runs it once:
+
+```toml
+# mise.toml — the one task you keep. It cannot come from the image: it is what fetches from it
+[tasks."gw:sync-tasks"]
+description = "Pull the gw:* tasks out of the running gateway (after gw:recreate)"
+run = "bash \"$SGW\" gw cat /usr/local/share/sekimore/gateway.mise.en.toml > \"$MISE_PROJECT_ROOT/.devcontainer/gateway.mise.toml\" && echo wrote"
+```
+
 ```bash
-docker exec sekimore-gw cat /usr/local/share/sekimore/gateway.mise.en.toml \
-  > .devcontainer/gateway.mise.toml      # or .ja.toml — it only changes what `mise tasks` prints
+mise run gw:sync-tasks      # or .ja.toml — it only changes what `mise tasks` prints
 ```
 
 ```toml
@@ -158,3 +167,8 @@ the running gateway has. This is what stops the drift that made 0.2.15 and
 
 `sgw.sh` still has to be yours, and still has to have `gw-tty`. The shipped file
 names the four primitives it uses in its header.
+
+**Commit the extracted file.** `mise` **silently ignores an include that is
+missing** — no error, no warning — so gitignoring it would leave every `gw:*`
+task quietly not existing for whoever clones next. Committing it also means a
+gateway upgrade shows up in `git diff`, which is the only place it is visible.
