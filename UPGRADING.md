@@ -1,3 +1,4 @@
+<!-- reviewed-up-to: 0.2.20 -->
 # Upgrading (what each release asks of you)
 
 *[日本語版](UPGRADING.ja.md)*
@@ -131,3 +132,29 @@ not work without `gw-tty`. Do that section first.
 The same release refuses a push that moves a tag the upstream already
 advertises. **Cutting a new tag is untouched**, so your release flow is
 unchanged.
+
+## 0.2.20 tasks come from the gateway now
+
+**Optional, and worth doing once.** The image carries its own `gw:*` tasks, so a
+project can stop keeping a copy:
+
+```bash
+docker exec sekimore-gw cat /usr/local/share/sekimore/gateway.mise.en.toml \
+  > .devcontainer/gateway.mise.toml      # or .ja.toml — it only changes what `mise tasks` prints
+```
+
+```toml
+# mise.toml — delete the gw:* tasks, keep your own
+[task_config]
+includes = [".devcontainer/gateway.mise.toml"]
+
+[env]
+SGW = "{{config_root}}/.devcontainer/scripts/sgw.sh"
+```
+
+Re-extract after every `mise run gw:recreate`, and the tasks are always the ones
+the running gateway has. This is what stops the drift that made 0.2.15 and
+0.2.19 above into traps.
+
+`sgw.sh` still has to be yours, and still has to have `gw-tty`. The shipped file
+names the four primitives it uses in its header.
