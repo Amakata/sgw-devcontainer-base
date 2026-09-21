@@ -37,7 +37,9 @@ sekimore-gw (セキュリティゲートウェイ) を経由するネットワ�
   どちらも **同じ `sekimore-gw` イメージ** (`ARG SEKIMORE_GW_IMAGE`、既定 `ghcr.io/amakata/sekimore-gw:0.2.13`)
   から `COPY --from` で取るので版がずれない。gateway に relay (git / GitHub API 中継関所) が居れば
   agent-setup が使い捨て鍵・案件トークン・known_hosts・署名鍵を自動で用意する
-  (`examples/sgw-sample/.devcontainer/docker-compose.relay.yml` 参照)
+  (`examples/sgw-sample/.devcontainer/docker-compose.relay.yml` 参照)。
+  案件トークンには期限があり (gateway の `relay.token_ttl`、既定 12 時間)、切れると
+  ラッパー `sekimore` が bootstrap をやり直して取り直すので、コンテナの再起動は要らない
 - デフォルト zsh rc.d スニペット (`/etc/skel/zsh-rc.d/`)
   XDG 設定、mise activate、エイリアス、プラグイン設定を含む。
   post-create で `~/.config/zsh/rc.d/` にコピーして使う

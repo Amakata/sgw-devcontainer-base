@@ -12,6 +12,10 @@ DevContainer のベースイメージ — Dockerfile と焼き込む道具、同
 
 ## 0.2.18（2026-09-21）
 
+### Fix
+
+- ラッパー `sekimore` が期限切れの案件トークンを取り直せるようになった。`POST /bootstrap` を呼ぶ (`sekimore-relay agent bootstrap` は元から無い)。env ファイルは置き場が root のものなので上書きで書く (#38)
+
 ### Enhancement
 
 - この変更履歴を英語と日本語で追加した。gateway と relay が既に使っている形に合わせた (#26)

@@ -15,6 +15,10 @@ and the tag on each are the record.
 
 ## 0.2.18 (2026-09-21)
 
+### Fix
+
+- the `sekimore` wrapper renews an expired project token again: it calls `POST /bootstrap` (`sekimore-relay agent bootstrap` never existed) and rewrites the env file in place, because its directory is root's (#38)
+
 ### Enhancement
 
 - added this changelog, in English and Japanese, in the shape the gateway and the relay already use (#26)
