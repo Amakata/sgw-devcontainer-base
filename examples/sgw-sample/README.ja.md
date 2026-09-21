@@ -1,0 +1,67 @@
+# sgw-sample
+
+*[English](README.md)*
+
+`sgw-devcontainer-base` を使った最小構成の devcontainer サンプル。
+
+- `sekimore-gw` を経由するネットワーク分離構成
+- `sekimore-relay` (git / GitHub API 中継関所) を使う構成 (`docker-compose.relay.yml`)。
+  AI は `git@github.com:Org/Repo.git` をそのまま使えるが、鍵は使い捨て・上流の認証は
+  gateway 内の依頼者の ssh-agent で行う。案件外リポジトリや許可外の操作は関所が拒否する
+- base image を `FROM` するだけの薄い `Dockerfile`
+- 特定バージョンの Python / Node.js / Ruby / Rust を `mise` でインストールする例
+  (PHP は Dockerfile でコメントアウトしてあり、必要に応じて有効化可能)
+
+## 使い方
+
+ホスト (Mac + Docker Desktop) 側の操作は `mise.toml` の task にまとめてある (`mise tasks` で一覧)。
+
+1. `.devcontainer/.env.sample` を `.devcontainer/.env` にコピーして値を埋める
+   (`SEKIMORE_AGENT_SOCK` は依頼者の ssh-agent socket。Docker Desktop なら既定値のままでよい)
+2. `config/config.yml` の `relay.project.repos` / `permissions` をこのプロジェクトのものに書き換える
+3. Docker Desktop を (ssh-agent が使える状態で) 起動し、**VS Code を完全終了 (Cmd+Q) してから** Terminal.app で **`mise run vscode`** を実行して "Reopen in Container"。
+   macOS の `code` CLI は `open` 経由で本体を起動するため `env -u SSH_AUTH_SOCK code` では届かない。この task は launchd の `SSH_AUTH_SOCK` を外し、
+   本体を直接起動し、起動後に本体の環境を確認する (`mise run vscode:check`)。Docker Desktop を再起動するときは先に `mise run vscode:restore-agent-env`。
+   `SSH_AUTH_SOCK` を渡さずに VS Code を起動するのは、Dev Containers 拡張が依頼者の ssh-agent を無条件に dev へ
+   転送するため (無効化設定なし)。普通に開くと post-create が **ERROR で止まり**、この手順を案内する
+4. **`mise run gw:unlock`** で秘密ストアを解錠する。**ゲートウェイを作り直すたびに毎回必要。**
+   0.2.19 から上流 API トークンはこのストアに入っており、施錠中は関所が GitHub API を一切使えない
+   (git の push/pull は SSH なので通る)。鍵はメモリにしか無いので、ゲートウェイが再起動したらまた解錠する
+5. gateway 側の初回だけ **`mise run gw:login`** (device flow。上流トークンと known_hosts を保存)。
+   解錠より先には実行できない — 保存先が開いていないため
+6. **`mise run dev:signing-key`** で表示される署名用公開鍵を GitHub の Settings → SSH and GPG keys に
+   "Signing Key" として登録する (AI のコミットがあなたの鍵ではなくこの鍵で署名される)。鍵のコメント
+   (= GitHub の Title) は「sekimore-agent-signing: <案件名> / <あなたの名前> <メール>」。変えたいときは `.env` の `SEKIMORE_SIGNING_KEY_COMMENT`
+7. **`mise run relay:verify`** で一式を確認する (gateway の状態、dev に agent が届いていないこと、関所経由の git、案件外の拒否)
+
+日常: `mise run gw:check` (状態) / `mise run gw:tokens` / `mise run gw:audit` (監査ログ) / `mise run gw:revoke-project` (案件終了) /
+`mise run gw -- <sekimore-relay の任意のサブコマンド>`。
+
+relay を使わない場合は `devcontainer.json` の `dockerComposeFile` から `docker-compose.relay.yml` を外し、
+`config/config.yml` の `domain_handlers:` / `relay:` を消す (`mise.toml` の gw:* / relay:* も不要になる)。
+
+新しいプロジェクトに使う場合は `.devcontainer/` と `mise.toml` をコピーする。
+
+## ファイル構成
+
+```
+sgw-sample/
+├── README.md
+├── mise.toml                       # ホスト側の操作 (vscode / gw:unlock / gw:login / gw:recreate / relay:verify …)
+└── .devcontainer/
+    ├── devcontainer.json
+    ├── docker-compose.yml          # dev + sekimore-gw の 2 サービス
+    ├── docker-compose.relay.yml    # sekimore-relay 用 overlay (agent socket のマウント、鍵 volume)
+    ├── Dockerfile                  # FROM sgw-devcontainer-base + mise で特定バージョン install
+    ├── .env.sample
+    ├── .gitignore
+    ├── config/
+    │   ├── config.yml              # sekimore-gw 許可ドメインリスト + relay の案件ポリシー
+    │   └── squid/
+    │       └── squid.conf.template
+    ├── scripts/
+    │   ├── post-create.sh          # zsh rc.d の展開、agent 転送の検知 (ERROR で止める)
+    │   └── sgw.sh                  # mise task が使う: compose ラベルで gateway / dev コンテナを見つけて docker exec
+    └── zsh-config/
+        └── rc.d/                   # プロジェクト固有 zsh 設定
+```

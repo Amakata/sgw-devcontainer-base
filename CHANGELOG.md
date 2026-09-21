@@ -17,6 +17,12 @@ Starts at 0.2.18. Releases before it are not written up here; the pull requests
 and the tag on each are the record. The gateway each of them took is at the
 bottom.
 
+## 0.2.19 (unreleased)
+
+### Fix
+
+- the sample devcontainer takes gateway 0.2.29 — the one this image takes — instead of the 0.2.19 it was pinned to, its comments are English throughout as the rest of the sample has been since 0.2.18, and `gw:sync-tasks` pulls the English task file out of the image, so the `gateway.mise.toml` committed beside it is 0.2.29's and has `gw:unlock-auto` (#41)
+
 ## 0.2.18 (2026-09-21)
 
 ### Fix

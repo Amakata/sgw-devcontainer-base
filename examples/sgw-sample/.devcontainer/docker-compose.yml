@@ -6,7 +6,7 @@ networks:
 
 services:
   sekimore-gw:
-    image: ghcr.io/amakata/sekimore-gw:0.2.19
+    image: ghcr.io/amakata/sekimore-gw:0.2.29
     cap_add:
       - NET_ADMIN
       - NET_RAW
@@ -49,7 +49,7 @@ services:
       - claude-code-commandhistory:/commandhistory
       - pnpm-store:/pnpm-store
       - mise-store:/home/vscode/.local/share/mise/installs
-      # overlayfs上でoverlayfsはネストできないため /var/lib/docker 全体を別ボリュームに逃がす
+      # overlayfs cannot be nested on overlayfs, so /var/lib/docker goes to a volume of its own
       - docker-store:/var/lib/docker
       - ..:/workspace:cached
     environment:
