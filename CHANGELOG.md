@@ -10,8 +10,12 @@ Entries are grouped **Security**, **Fix**, **Enhancement** — most urgent first
 and say what changed, with the pull request that changed it. The reasoning is in
 the pull request.
 
+Every release names the sekimore-gw version it takes (`ARG SEKIMORE_GW_IMAGE` in
+the Dockerfile), so the pairing between the two is this file.
+
 Starts at 0.2.18. Releases before it are not written up here; the pull requests
-and the tag on each are the record.
+and the tag on each are the record. The gateway each of them took is at the
+bottom.
 
 ## 0.2.18 (2026-09-21)
 
@@ -21,4 +25,18 @@ and the tag on each are the record.
 
 ### Enhancement
 
+- takes gateway 0.2.15, unchanged from 0.2.17 (#39)
+- README.md is English and README.ja.md Japanese, as the other repositories are; the sample `config.yml` is commented in English and lists every key the gateway reads, all 28 permissions among them (#39)
 - added this changelog, in English and Japanese, in the shape the gateway and the relay already use (#26)
+
+## Before 0.2.18
+
+Not written up: the pull request and the tag on each is the record. What is kept
+here is the gateway each one took.
+
+- 0.2.17 took gateway 0.2.15
+- 0.2.16 took gateway 0.2.15
+- 0.2.15 took gateway 0.2.14
+- 0.2.14 took gateway 0.2.13
+- 0.2.13 took gateway 0.2.13
+- 0.2.12 took gateway 0.2.11
