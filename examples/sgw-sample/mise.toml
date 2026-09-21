@@ -1,18 +1,37 @@
 # Mac (Docker Desktop) 側の日常操作を `mise run <task>` にまとめる。一覧は `mise tasks`。
-# gw:* / dev:* / relay:* はホスト側専用 (devcontainer の中の Docker には gateway が居ないので、中では拒否する)。
+# ホスト側専用 (devcontainer の中の Docker には gateway が居ないので、中では拒否する)。
 #
-#   mise run vscode          # SSH_AUTH_SOCK を渡さずに VS Code を開く (依頼者の鍵を AI に見せない。VS Code は先に完全終了)
-#   mise run gw:unlock       # 秘密ストアの解錠。**これが先**。0.2.19 から関所は上流トークンを
-#                            # ストアから読むので、施錠中は GitHub API が一切通らない
-#   mise run gw:login        # gateway の relay を GitHub に device flow でログイン (初回のみ)
-#   mise run gw:check        # relay の状態 (ssh-agent / known_hosts / 上流トークン / 登録鍵)
+# **`gw:*` はここには無い。** ゲートウェイのイメージが自分の版のタスクを同梱していて、
+# それを include している (0.2.20〜)。だから `mise run gw:unlock` があるかどうかは、
+# 動いているゲートウェイが unlock を持っているかと一致する。コピーだと取り残される:
+# 公開サンプルは `gw:unlock` を4版ぶん欠いたままだった。
+#
+#   mise run gw:sync-tasks   # イメージからタスクを取り出す。gw:recreate のあとに
+#   mise tasks               # いま何が使えるか
+#
+# 順序だけ覚えておく:
+#
+#   mise run vscode          # SSH_AUTH_SOCK を渡さずに VS Code を開く (依頼者の鍵を AI に見せない)
+#   mise run gw:unlock       # 秘密ストアの解錠。**これが先**。施錠中は GitHub API が通らない
+#   mise run gw:login        # 初回のみ。解錠より先には実行できない
 #   mise run relay:verify    # 一式の受け入れ確認
-#   mise run gw -- <args>    # 任意の sekimore-relay サブコマンド
-#   mise run gw:recreate     # ゲートウェイを新しいイメージで作り直す (image タグを上げたあと)
+
+[task_config]
+# 取り出し済みのファイル。**無くても mise は黙って無視する**ので、`gw:*` が見当たらないときは
+# ここが空か、取り出していないかを疑う (`mise run gw:sync-tasks`)。
+includes = [".devcontainer/gateway.mise.toml"]
 
 [env]
 SGW = "{{config_root}}/.devcontainer/scripts/sgw.sh"
 
+# ---- ゲートウェイのタスクを取り出す ----
+# これと sgw.sh だけが、イメージから配れずここに残るもの。ゲートウェイを見つけて exec する
+# 側なので、新しいゲートウェイが存在する前に必要になる (鶏と卵)。だから最小にしてある。
+[tasks."gw:sync-tasks"]
+description = "動いているゲートウェイから gw:* タスクを取り出す (gw:recreate のあとに実行する)"
+run = "bash \"$SGW\" gw cat /usr/local/share/sekimore/gateway.mise.ja.toml > \"$MISE_PROJECT_ROOT/.devcontainer/gateway.mise.toml\" && echo 'wrote .devcontainer/gateway.mise.toml — git diff で差分を見てコミットする'"
+
+# ---- 起動 ----
 # ---- 起動 ----
 [tasks.vscode]
 description = "VS Code を SSH_AUTH_SOCK が届かない状態で起動する (launchd の変数を外し、open を通さず直接起動、起動後に本体の環境を確認)"
@@ -37,120 +56,6 @@ run = 'bash "$SGW" ps'
 [tasks.down]
 description = "compose スタックを停止・削除する (volume は残る。VS Code を閉じた後の後片付け)"
 run = 'docker compose -p "$(bash "$SGW" project)" down'
-
-# ---- gateway (sekimore-gw) の relay 操作 ----
-[tasks.gw]
-description = "gateway で sekimore-relay <args> を実行 (例: mise run gw -- revoke --label skm_xxxxxxxx)"
-run = 'bash "$SGW" gw sekimore-relay'
-
-[tasks."gw:login"]
-description = "GitHub に device flow でログイン (上流トークンと known_hosts を /data/relay に保存。初回のみ)"
-run = 'bash "$SGW" gw sekimore-relay login'
-
-[tasks."gw:logout"]
-description = "上流トークンを削除"
-run = 'bash "$SGW" gw sekimore-relay logout'
-
-[tasks."gw:whoami"]
-description = "gateway がどの GitHub identity として動くか"
-run = 'bash "$SGW" gw sekimore-relay whoami'
-
-[tasks."gw:check"]
-description = "relay の設定と状態 (ssh-agent / known_hosts / 上流トークン / 登録鍵 / トークン数)"
-run = 'bash "$SGW" gw sekimore-relay check'
-
-# ---- 秘密ストア (0.2.15) ----
-# パスフレーズはプロンプトでのみ受け取る。引数や環境変数にすると ps に出るため。
-# sgw.sh が端末を検出して -it を付けるので、そのまま対話できる。
-#
-# 0.2.19 から上流 API トークンがここに入る。施錠中は関所が GitHub API を使えない
-# (git の push/pull は SSH なので通る)。ゲートウェイを作り直したら必ず解錠する。
-[tasks."gw:unlock"]
-description = "秘密ストアを解錠する (ゲートウェイ再作成のたびに必須。初回はパスフレーズの設定。解錠しないと GitHub API が通らない)"
-# gw-tty: 端末を必ず渡す経路。mise が出力を加工すると stdout がパイプになり、通常の gw は
-# docker exec に -t を付けないので、コンテナの中で端末が無くなる
-raw = true
-run = 'bash "$SGW" gw-tty sekimore-relay unlock'
-
-[tasks."gw:lock"]
-description = "秘密ストアの鍵を忘れる (次の解錠まで GitHub API も止まる。0.2.19 からトークンのキャッシュも同時に落ちる)"
-run = 'bash "$SGW" gw sekimore-relay lock'
-
-[tasks."gw:store-status"]
-description = "秘密ストアが解錠済みか、施錠中か、未初期化かを表示する"
-run = 'bash "$SGW" gw sekimore-relay store-status'
-
-[tasks."gw:passphrase"]
-description = "秘密ストアのパスフレーズを変更する (--kdf pbkdf2-sha256 で KDF も切り替えられる)"
-raw = true
-run = 'bash "$SGW" gw-tty sekimore-relay passphrase'
-# export は施錠中でも取れる (鍵が要らない)。封じてあるが、守っているのはパスフレーズだけ。
-# raw: JSON を標準出力にそのまま流す。mise が出力に接頭辞を付けると壊れる
-[tasks."gw:store-export"]
-description = "秘密ストアを封じたまま書き出す: mise run gw:store-export > store.json"
-raw = true
-run = 'bash "$SGW" gw sekimore-relay store-export'
-
-[tasks."gw:store-import"]
-description = "空の秘密ストアを envelope で置き換える: mise run gw:store-import < store.json"
-raw = true
-run = 'bash "$SGW" gw sekimore-relay store-import'
-
-[tasks."gw:reload-status"]
-description = "config.yml の保存が反映される状態か (gw 0.2.13〜)。AI に作業を渡す前に確認する"
-run = 'bash "$SGW" gw python -m src.maint reload-status'
-
-[tasks."gw:reload-follow"]
-description = "反映の窓を開ける (既定 30m): mise run gw:reload-follow -- 1h。config.yml を詰めている間だけ"
-run = 'bash "$SGW" gw python -m src.maint reload-follow'
-
-[tasks."gw:reload-freeze"]
-description = "反映の窓を今すぐ閉じる。config.yml は dev から書けるので、AI に渡す前にこれを打つ"
-run = 'bash "$SGW" gw python -m src.maint reload-freeze'
-
-[tasks."gw:tokens"]
-description = "発行済み案件トークンの一覧 (ラベル / 期限 / 使用回数 / 状態)"
-run = 'bash "$SGW" gw sekimore-relay tokens'
-
-[tasks."gw:revoke-project"]
-description = "案件の全トークンを失効 (案件終了時)"
-run = 'bash "$SGW" gw sekimore-relay revoke-project'
-
-[tasks."gw:bootstrap"]
-description = "自動登録の kill-switch: mise run gw:bootstrap -- disable|enable|status"
-run = 'bash "$SGW" gw sekimore-relay bootstrap'
-
-[tasks."gw:db-stats"]
-description = "gateway のログ DB (DNS / firewall / proxy) の件数・期間・サイズ・索引 (gw 0.2.3〜)"
-run = 'bash "$SGW" gw python -m src.maint db-stats'
-
-[tasks."gw:db-prune"]
-description = "N 日より古いログを削除 (記録は既定で残すので明示的に): mise run gw:db-prune -- --before-days 90 --yes [--vacuum]"
-run = 'bash "$SGW" gw python -m src.maint db-prune'
-
-[tasks."gw:db-reset"]
-description = "ログ DB を空にして VACUUM (relay の監査は別ファイル): mise run gw:db-reset -- --yes"
-run = 'bash "$SGW" gw python -m src.maint db-reset'
-
-[tasks."gw:audit"]
-description = "relay の監査ログを追う (全ての拒否と操作。Ctrl-C で終了)"
-run = 'bash "$SGW" gw tail -n 50 -f /data/relay/audit.jsonl'
-
-[tasks."gw:logs"]
-description = "gateway のコンテナログを追う"
-run = 'docker logs -f --tail 100 "$(bash "$SGW" id sekimore-gw)"'
-
-[tasks."gw:restart"]
-description = "gateway を再起動 (config.yml の domain_handlers / relay を変えたあと。dev は動いたまま)"
-run = 'docker restart "$(bash "$SGW" id sekimore-gw)"'
-
-[tasks."gw:recreate"]
-description = "gateway を最新イメージで pull して作り直す (compose の image タグを上げたあと。docker restart では入れ替わらない)"
-run = 'bash "$SGW" recreate'
-
-[tasks."gw:shell"]
-description = "gateway のシェル (root)"
-run = 'bash "$SGW" gw bash'
 
 # ---- dev (AI のサンドボックス) ----
 [tasks."dev:shell"]
