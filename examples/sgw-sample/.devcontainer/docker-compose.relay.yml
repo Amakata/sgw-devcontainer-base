@@ -13,6 +13,13 @@
 #          SEKIMORE_AGENT_SOCK=/home/vagrant/.ssh-agent/agent.sock)。転送を張り直すと socket の inode が変わり
 #          マウントが古くなるので `docker compose up -d --force-recreate sekimore-gw` が必要。
 #   * dev の使い捨て鍵 (~/.ssh/sekimore) を volume にして再ビルドでも変わらないようにする。
+#   * 署名鍵の socket を gateway と dev で共有する (sekimore-gw 0.2.29 以降、#59)。
+#       - config.yml に relay.signing_key を書くと、gateway がホストの ssh-agent の「1 本だけ」を
+#         絞り込んだ agent socket を /run/sekimore/signing-agent.sock に作る。dev はそこを
+#         SSH_AUTH_SOCK にして `git commit` するだけ。秘密鍵は dev に入らない。
+#       - この socket は git 署名 (SSHSIG, namespace=git) 以外を一切通さないので、認証には使えない。
+#         依頼者の他の鍵は同じ agent にあっても fingerprint で隠れる。
+#       - relay.signing_key を書かない場合、この volume は使われない (dev が従来どおり鍵を生成する)。
 #
 # 前提: 依頼者の agent が dev に転送されていないこと (dev 内で `ssh-add -l` が失敗すること)。
 # Dev Containers 拡張の暗黙転送の止め方は doc/sgw-devcontainer-base/design/sekimore-relay-agent.md D-6。
@@ -20,12 +27,17 @@ services:
   sekimore-gw:
     volumes:
       - ${SEKIMORE_AGENT_SOCK:-/run/host-services/ssh-auth.sock}:/ssh-agent/agent.sock:ro
+      # 署名 socket を置く volume (relay.signing_key を書いたときだけ使われる)
+      - sekimore-signing:/run/sekimore
     environment:
       - SSH_AUTH_SOCK=/ssh-agent/agent.sock
 
   dev:
     volumes:
       - sekimore-agent-keys:/home/vscode/.ssh/sekimore
+      # 同じ volume。read-write なのは unix socket への connect(2) に書き込み権限が要るため。
+      # socket 自体は 0600 で relay.signing_key.socket_uid (既定 1000 = vscode) の所有。
+      - sekimore-signing:/run/sekimore
     environment:
       # sekimore-agent-setup.sh が読む (auto: 鍵登録とトークン取得を自動化 / manual: 操作者が add-key と token を行う)
       - SEKIMORE_BOOTSTRAP=${SEKIMORE_BOOTSTRAP:-auto}
@@ -40,3 +52,5 @@ services:
 volumes:
   sekimore-agent-keys:
     name: sekimore-agent-keys-${DEVCONTAINER_ID}
+  sekimore-signing:
+    name: sekimore-signing-${DEVCONTAINER_ID}
