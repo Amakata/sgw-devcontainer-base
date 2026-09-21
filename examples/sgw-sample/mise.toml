@@ -2,10 +2,13 @@
 # gw:* / dev:* / relay:* はホスト側専用 (devcontainer の中の Docker には gateway が居ないので、中では拒否する)。
 #
 #   mise run vscode          # SSH_AUTH_SOCK を渡さずに VS Code を開く (依頼者の鍵を AI に見せない。VS Code は先に完全終了)
+#   mise run gw:unlock       # 秘密ストアの解錠。**これが先**。0.2.19 から関所は上流トークンを
+#                            # ストアから読むので、施錠中は GitHub API が一切通らない
 #   mise run gw:login        # gateway の relay を GitHub に device flow でログイン (初回のみ)
 #   mise run gw:check        # relay の状態 (ssh-agent / known_hosts / 上流トークン / 登録鍵)
 #   mise run relay:verify    # 一式の受け入れ確認
 #   mise run gw -- <args>    # 任意の sekimore-relay サブコマンド
+#   mise run gw:recreate     # ゲートウェイを新しいイメージで作り直す (image タグを上げたあと)
 
 [env]
 SGW = "{{config_root}}/.devcontainer/scripts/sgw.sh"
@@ -56,6 +59,55 @@ run = 'bash "$SGW" gw sekimore-relay whoami'
 description = "relay の設定と状態 (ssh-agent / known_hosts / 上流トークン / 登録鍵 / トークン数)"
 run = 'bash "$SGW" gw sekimore-relay check'
 
+# ---- 秘密ストア (0.2.15) ----
+# パスフレーズはプロンプトでのみ受け取る。引数や環境変数にすると ps に出るため。
+# sgw.sh が端末を検出して -it を付けるので、そのまま対話できる。
+#
+# 0.2.19 から上流 API トークンがここに入る。施錠中は関所が GitHub API を使えない
+# (git の push/pull は SSH なので通る)。ゲートウェイを作り直したら必ず解錠する。
+[tasks."gw:unlock"]
+description = "秘密ストアを解錠する (ゲートウェイ再作成のたびに必須。初回はパスフレーズの設定。解錠しないと GitHub API が通らない)"
+# gw-tty: 端末を必ず渡す経路。mise が出力を加工すると stdout がパイプになり、通常の gw は
+# docker exec に -t を付けないので、コンテナの中で端末が無くなる
+raw = true
+run = 'bash "$SGW" gw-tty sekimore-relay unlock'
+
+[tasks."gw:lock"]
+description = "秘密ストアの鍵を忘れる (次の解錠まで GitHub API も止まる。0.2.19 からトークンのキャッシュも同時に落ちる)"
+run = 'bash "$SGW" gw sekimore-relay lock'
+
+[tasks."gw:store-status"]
+description = "秘密ストアが解錠済みか、施錠中か、未初期化かを表示する"
+run = 'bash "$SGW" gw sekimore-relay store-status'
+
+[tasks."gw:passphrase"]
+description = "秘密ストアのパスフレーズを変更する (--kdf pbkdf2-sha256 で KDF も切り替えられる)"
+raw = true
+run = 'bash "$SGW" gw-tty sekimore-relay passphrase'
+# export は施錠中でも取れる (鍵が要らない)。封じてあるが、守っているのはパスフレーズだけ。
+# raw: JSON を標準出力にそのまま流す。mise が出力に接頭辞を付けると壊れる
+[tasks."gw:store-export"]
+description = "秘密ストアを封じたまま書き出す: mise run gw:store-export > store.json"
+raw = true
+run = 'bash "$SGW" gw sekimore-relay store-export'
+
+[tasks."gw:store-import"]
+description = "空の秘密ストアを envelope で置き換える: mise run gw:store-import < store.json"
+raw = true
+run = 'bash "$SGW" gw sekimore-relay store-import'
+
+[tasks."gw:reload-status"]
+description = "config.yml の保存が反映される状態か (gw 0.2.13〜)。AI に作業を渡す前に確認する"
+run = 'bash "$SGW" gw python -m src.maint reload-status'
+
+[tasks."gw:reload-follow"]
+description = "反映の窓を開ける (既定 30m): mise run gw:reload-follow -- 1h。config.yml を詰めている間だけ"
+run = 'bash "$SGW" gw python -m src.maint reload-follow'
+
+[tasks."gw:reload-freeze"]
+description = "反映の窓を今すぐ閉じる。config.yml は dev から書けるので、AI に渡す前にこれを打つ"
+run = 'bash "$SGW" gw python -m src.maint reload-freeze'
+
 [tasks."gw:tokens"]
 description = "発行済み案件トークンの一覧 (ラベル / 期限 / 使用回数 / 状態)"
 run = 'bash "$SGW" gw sekimore-relay tokens'
@@ -91,6 +143,10 @@ run = 'docker logs -f --tail 100 "$(bash "$SGW" id sekimore-gw)"'
 [tasks."gw:restart"]
 description = "gateway を再起動 (config.yml の domain_handlers / relay を変えたあと。dev は動いたまま)"
 run = 'docker restart "$(bash "$SGW" id sekimore-gw)"'
+
+[tasks."gw:recreate"]
+description = "gateway を最新イメージで pull して作り直す (compose の image タグを上げたあと。docker restart では入れ替わらない)"
+run = 'bash "$SGW" recreate'
 
 [tasks."gw:shell"]
 description = "gateway のシェル (root)"

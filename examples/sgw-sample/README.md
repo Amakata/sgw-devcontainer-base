@@ -22,11 +22,15 @@
    本体を直接起動し、起動後に本体の環境を確認する (`mise run vscode:check`)。Docker Desktop を再起動するときは先に `mise run vscode:restore-agent-env`。
    `SSH_AUTH_SOCK` を渡さずに VS Code を起動するのは、Dev Containers 拡張が依頼者の ssh-agent を無条件に dev へ
    転送するため (無効化設定なし)。普通に開くと post-create が **ERROR で止まり**、この手順を案内する
-4. gateway 側の初回だけ **`mise run gw:login`** (device flow。上流トークンと known_hosts を保存)
-5. **`mise run dev:signing-key`** で表示される署名用公開鍵を GitHub の Settings → SSH and GPG keys に
+4. **`mise run gw:unlock`** で秘密ストアを解錠する。**ゲートウェイを作り直すたびに毎回必要。**
+   0.2.19 から上流 API トークンはこのストアに入っており、施錠中は関所が GitHub API を一切使えない
+   (git の push/pull は SSH なので通る)。鍵はメモリにしか無いので、ゲートウェイが再起動したらまた解錠する
+5. gateway 側の初回だけ **`mise run gw:login`** (device flow。上流トークンと known_hosts を保存)。
+   解錠より先には実行できない — 保存先が開いていないため
+6. **`mise run dev:signing-key`** で表示される署名用公開鍵を GitHub の Settings → SSH and GPG keys に
    "Signing Key" として登録する (AI のコミットがあなたの鍵ではなくこの鍵で署名される)。鍵のコメント
    (= GitHub の Title) は「sekimore-agent-signing: <案件名> / <あなたの名前> <メール>」。変えたいときは `.env` の `SEKIMORE_SIGNING_KEY_COMMENT`
-6. **`mise run relay:verify`** で一式を確認する (gateway の状態、dev に agent が届いていないこと、関所経由の git、案件外の拒否)
+7. **`mise run relay:verify`** で一式を確認する (gateway の状態、dev に agent が届いていないこと、関所経由の git、案件外の拒否)
 
 日常: `mise run gw:check` (状態) / `mise run gw:tokens` / `mise run gw:audit` (監査ログ) / `mise run gw:revoke-project` (案件終了) /
 `mise run gw -- <sekimore-relay の任意のサブコマンド>`。
@@ -41,7 +45,7 @@ relay を使わない場合は `devcontainer.json` の `dockerComposeFile` か�
 ```
 sgw-sample/
 ├── README.md
-├── mise.toml                       # ホスト側の操作 (vscode / gw:login / gw:check / relay:verify …)
+├── mise.toml                       # ホスト側の操作 (vscode / gw:unlock / gw:login / gw:recreate / relay:verify …)
 └── .devcontainer/
     ├── devcontainer.json
     ├── docker-compose.yml          # dev + sekimore-gw の 2 サービス
