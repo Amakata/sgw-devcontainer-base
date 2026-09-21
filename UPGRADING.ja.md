@@ -1,4 +1,4 @@
-<!-- reviewed-up-to: 0.2.28 -->
+<!-- reviewed-up-to: 0.2.29 -->
 # 更新のしかた (版ごとに必要な作業)
 
 *[English](UPGRADING.md)*
@@ -31,6 +31,7 @@
 | 0.2.19 〜 0.2.21 | [0.2.22](#0222-proxy-の認証情報がストアに移った) — **上流 proxy にパスワードが要る場合だけ** |
 | 0.2.22 〜 0.2.26 | [0.2.27](#0227-タグは署名が必須になった) — **エージェントにタグを push させている場合だけ** |
 | 0.2.27 | [0.2.28](#0228-dependabot-アラートは任意) — **エージェントに Dependabot アラートを読ませたい場合だけ** |
+| 0.2.28 | [0.2.29](#0229-解錠を自動化できるようになった) — **解錠を自動化したい場合か、AI のコミットを Verified のままにしたい場合だけ** |
 
 ---
 
@@ -241,3 +242,150 @@ relay:
 そのあと `mise run gw:recreate`、**さらに `mise run gw:login` をもう一度**。alerts API には
 `security_events` の OAuth scope が要り、0.2.28 より前の login は要求していません。無いと
 `sekimore security alerts` は GitHub の 403 を受けます。
+
+## 0.2.29 解錠を自動化できるようになった
+
+**使いたくなければ何も要りません。** `mise run gw:unlock` は変わらず、何も保存していない
+ホストの挙動もこれまでどおりです。
+
+`mise run gw:sync-tasks` で新しいタスクを取り出し、ホストごとに一度だけ:
+
+```bash
+mise run gw:keychain-set     # パスフレーズを尋ね、このホストの keychain に入れる
+```
+
+以後は `mise run gw:recreate` が自分で解錠します。`docker restart` のあとなら
+`mise run gw:unlock-auto` 単体でも解錠できます。
+
+探す順番は次のとおりです。`<project>` は `MISE_PROJECT_ROOT` の指すディレクトリ名なので、
+1 台のホストに 2 案件あっても別々の項目になります。
+
+| | 置き場 | 機械に縛るもの |
+|---|---|---|
+| macOS | Keychain。service `sekimore-gw`、account `<project>` | ログイン。ログインするまで開かない |
+| Linux デスクトップ | Secret Service (`secret-tool`)。`service=sekimore-gw project=<project>` | ログインセッション |
+| サーバ | `/etc/sekimore/<project>.passphrase.cred` を `systemd-creds decrypt` で読む | TPM かホスト鍵。ディスクを複製しても持ち出せない |
+| サーバ・最後の手段 | `/etc/sekimore/<project>.passphrase`（root 所有 0600） | **何も無い。** ファイルを読めた者がパスフレーズを持つ |
+
+keychain の無いホストでは `gw:keychain-set` がサーバ向け 2 通りの手順をそのまま表示します。
+`/etc/sekimore` 自体は 0755 のままにしてください。タスクはファイルが見えてから初めて
+`sudo -n` を使い、sudo のパスワードは決して尋ねません（`gw:recreate` が止まってしまうため）。
+
+ここでいう `/etc/sekimore` は**ホスト側**のものです。ゲートウェイの中にも同名のディレクトリが
+あります（`config.yml` の置き場）が、ホスト側をそこに mount すると、この設計が
+ゲートウェイから遠ざけているはずのパスフレーズを渡してしまいます。
+
+変わらないことが 2 つあります。
+
+- **ゲートウェイは何も知りません。** パスフレーズはホストが読み、
+  `sekimore-relay unlock --stdin` に流し込みます。届く経路は今までどおり control socket で、
+  dev コンテナはそれを mount していませんし、ゲートウェイの中から取りに行く手段もありません。
+  export を守るのが相変わらずパスフレーズ 1 つだけである点も同じです。
+- **最初のパスフレーズは手で打ちます。** 未初期化のストアに対して `unlock --stdin` は拒否します。
+  最初の 1 つは思い出すものではなく決めるもので、確認のため 2 回尋ねるからです。
+
+解錠させたくないときは:
+
+```bash
+SGW_NO_AUTO_UNLOCK=1 mise run gw:recreate
+```
+
+ファイルの置き場を `/etc/sekimore` 以外にするなら `SGW_PASSPHRASE_DIR` です。
+
+## 0.2.29 署名鍵を人につき 1 本にする
+
+**任意です。何もしなければ今までどおり**、dev コンテナが自分で署名鍵を生成します。
+
+その鍵は使い捨てですが、署名鍵は使い捨てにできません。GitHub には人が手で登録し、
+消すとその鍵が署名した全てのコミットから Verified が外れます。つまり鍵の volume を
+消すと「作り直し」ではなく喪失で、以後のコミットは GitHub が知らない鍵で署名されます。
+そうと分かる手段もありませんでした。`commit.gpgsign` は無条件に true で、
+鍵が登録されているかを確かめる仕組みはどこにも無かったからです。
+
+置き換える手順 — 人につき 1 本、登録は一度だけ:
+
+1. 手元で鍵を作る（無ければ）。**自分自身の署名鍵とは別にします**。
+   分けておくことが、履歴の中で AI のコミットを見分けられる根拠になります。
+
+   ```bash
+   ssh-keygen -t ed25519 -C "sekimore AI signing key" -f ~/.ssh/sekimore_signing
+   ssh-add ~/.ssh/sekimore_signing          # Mac なら --apple-use-keychain
+   ssh-keygen -lf ~/.ssh/sekimore_signing.pub   # SHA256:… の fingerprint
+   ```
+
+2. **公開鍵**を GitHub に一度だけ登録する。Settings → SSH and GPG keys →
+   New SSH key → Key type: **Signing Key**。
+
+3. fingerprint を `.devcontainer/config/config.yml` に書く:
+
+   ```yaml
+   relay:
+     signing_key:
+       fingerprint: "SHA256:…"     # 手順 1 のもの
+   ```
+
+   自分の他の鍵は同じ agent に入れたままで構いません。relay が dev に渡すのは
+   この fingerprint 1 本だけに答え、git 署名以外を一切通さない**絞り込んだ**
+   socket です。他の鍵は見えず、この socket では認証もできません。
+
+4. socket の volume を `.devcontainer/docker-compose.relay.yml` の**両方の**
+   サービスに足す（雛形には入っています）:
+
+   ```yaml
+   services:
+     sekimore-gw:
+       volumes:
+         - sekimore-signing:/run/sekimore
+     dev:
+       volumes:
+         - sekimore-signing:/run/sekimore
+
+   volumes:
+     sekimore-signing:
+       name: sekimore-signing-${DEVCONTAINER_ID}
+   ```
+
+5. `mise run gw:recreate` のあと Rebuild Container。効いたか確認する:
+
+   ```bash
+   mise run gw:check     # 「署名鍵: ホストの agent にある」
+   ```
+
+   dev の中では `ssh-add -l` が**ちょうど 1 本**を出すようになります（絞り込んだ
+   socket 越しの署名鍵）。`mise.toml` の `relay:verify` が「`ssh-add -l` が成功したら
+   FAIL」のままなら、その部分を差し替えてください:
+
+   ```bash
+   echo "== dev: only the gateway's filtered signing key may be reachable"
+   n=$(bash "$SGW" dev ssh-add -l 2>/dev/null | grep -c . || true)
+   if [ "$n" = 1 ]; then
+     echo "OK: exactly one key (the signing key, via the gateway's filtered agent)"
+   elif [ "$n" = 0 ]; then
+     echo "OK: no ssh-agent in dev"
+   else
+     echo "❌ FAIL: ssh-add -l lists $n keys inside dev — the operator's keys are exposed to the AI. Reopen with: mise run vscode"
+     fail=1
+   fi
+   ```
+
+古い `~/.ssh/sekimore/signing_ed25519` は消しません。履歴に残っているコミットを
+署名した鍵であり、それらの Verified を保つには公開鍵を GitHub に登録したままに
+しておく必要があります。
+
+**`signing: required`** は別の話で、これも任意です。branch への push に署名の無い
+コミットが含まれていたら関所が拒否します。今回の件を 20 コミット早く見つけられた
+はずの検査です。既定は `optional` なので、既存の案件の挙動は変わりません。
+
+```yaml
+relay:
+  project:
+    signing: required     # 上流層や repos[] でも指定できる
+```
+
+有効にするのは手順 5 が通ってからにしてください。鍵が無い状態で有効にすると、
+全ての push が拒否されます。
+
+`required` は**上流 API も使います**。push の履歴が pack から出た地点で、そのコミットを
+上流が既に持っているかを問い合わせるためです（そうしないと、delta に隠れたコミットと
+上流の履歴が pack の中から区別できません）。解錠（`mise run gw:unlock`）と login が
+できていないと push は拒否されます。拒否のメッセージがどちらかを言います。

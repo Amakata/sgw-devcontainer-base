@@ -25,7 +25,7 @@ bottom.
 
 ### Enhancement
 
-- takes gateway 0.2.15, unchanged from 0.2.17 (#39)
+- takes gateway 0.2.29 (#40)
 - README.md is English and README.ja.md Japanese, as the other repositories are; the sample `config.yml` is commented in English and lists every key the gateway reads, all 28 permissions among them (#39)
 - added this changelog, in English and Japanese, in the shape the gateway and the relay already use (#26)
 

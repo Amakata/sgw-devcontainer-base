@@ -38,7 +38,7 @@ sekimore-gw (セキュリティゲートウェイ) を経由するネットワ�
   `sekimore-relay` CLI (`/usr/local/bin/sekimore-relay`)、ラッパー `sekimore`。
   どちらも **同じ `sekimore-gw` イメージ** から `COPY --from` で取るので版がずれない。
   どの版を取るかを決めるのは Dockerfile の `ARG SEKIMORE_GW_IMAGE`
-  (現在 `ghcr.io/amakata/sekimore-gw:0.2.15`) で、ここが唯一の出どころ。
+  (現在 `ghcr.io/amakata/sekimore-gw:0.2.29`) で、ここが唯一の出どころ。
   ローカルビルドでは `--build-arg SEKIMORE_GW_IMAGE=...` で差し替えられる。
   gateway に relay (git / GitHub API 中継関所) が居れば
   agent-setup が使い捨て鍵・案件トークン・known_hosts・署名鍵を自動で用意する
@@ -214,16 +214,15 @@ GitHub Actions (`.github/workflows/build-and-push.yml`) が次のタグで GHCR 
 
 このイメージが **dev コンテナに入れる** gateway — `sekimore` CLI と `agent-setup.sh` —
 を決めるのは Dockerfile の `ARG SEKIMORE_GW_IMAGE` ただ一つで、いまは
-`ghcr.io/amakata/sekimore-gw:0.2.15`。ローカルビルドでは
+`ghcr.io/amakata/sekimore-gw:0.2.29`。ローカルビルドでは
 `--build-arg SEKIMORE_GW_IMAGE=...` で差し替えられる。どのリリースがどの版を取ったかは
 [CHANGELOG.ja.md](CHANGELOG.ja.md) にリリースごとに書いてある。
 
 **プロジェクトが実際に動かす** gateway はこれとは別で、
 `.devcontainer/docker-compose.yml` の `image:` タグ。そちらは独立に動かせる。
 上げて `mise run gw:recreate` すればよく、このイメージを待つ必要は無い。
-いまは離れていて (このイメージは 0.2.15、gateway は 0.2.28)、次の base のリリースが
-0.2.29 を取り込む。gateway の各版が何を要求するかは [UPGRADING.ja.md](UPGRADING.ja.md)
-にある。ほとんどは何も要求しない。
+いまは揃っている (このイメージも gateway も 0.2.29)。gateway の各版が何を要求するかは
+[UPGRADING.ja.md](UPGRADING.ja.md) にある。ほとんどは何も要求しない。
 
 更新順序: sekimore-gw をタグ → GHCR 公開 → このリポジトリの `SEKIMORE_GW_IMAGE` 既定を上げて push →
 GHCR 公開 → `examples/sgw-sample` の compose の image tag を追従。base はバイナリを gateway イメージから取るため、
