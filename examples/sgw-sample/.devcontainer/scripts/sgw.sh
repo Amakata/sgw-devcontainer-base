@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# sgw.sh — この devcontainer の compose スタック (Dev Containers 拡張が起動したもの) を Mac 側から操作する。
-# mise.toml の task から呼ぶ。直接使うなら:
+# sgw.sh — operate this devcontainer's compose stack (started by the Dev Containers extension) from the Mac.
+# Called from the mise.toml tasks. To use it directly:
 #
-#   sgw.sh gw   [cmd...]   sekimore-gw コンテナで cmd を実行 (省略時: sekimore-relay check)
-#   sgw.sh dev  [cmd...]   dev コンテナで cmd を実行 (vscode ユーザー。省略時: zsh)
-#   sgw.sh id   <service>  コンテナ ID を表示
-#   sgw.sh project         compose プロジェクト名を表示 (Dev Containers は "<フォルダ名>_devcontainer")
-#   sgw.sh ps              スタックのコンテナ一覧
-#   sgw.sh recreate        gateway を最新イメージで pull して作り直す (docker restart では入れ替わらない)
+#   sgw.sh gw   [cmd...]   run cmd in the sekimore-gw container (default: sekimore-relay check)
+#   sgw.sh dev  [cmd...]   run cmd in the dev container (as the vscode user. default: zsh)
+#   sgw.sh id   <service>  print the container ID
+#   sgw.sh project         print the compose project name (Dev Containers: "<folder name>_devcontainer")
+#   sgw.sh ps              list the stack's containers
+#   sgw.sh recreate        pull the latest image and recreate the gateway (docker restart keeps the old one)
 #
-# 探し方: compose のラベル (service 名 + project の working_dir = この .devcontainer)。
-# プロジェクト名はフォルダ名に依存するので名前ではなくラベルで引く。
+# How it finds them: the compose labels (service name + the project's working_dir = this .devcontainer).
+# The project name depends on the folder name, so look it up by label rather than by name.
 set -euo pipefail
 
 ROOT=${MISE_PROJECT_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}
@@ -27,7 +27,8 @@ find_container() {
   local svc=$1 ids n
   ids=$(by_label --filter "label=com.docker.compose.service=$svc")
   if [ -z "$ids" ]; then
-    # working_dir ラベルが一致しない環境 (パスの正規化違い等) 向けフォールバック: service 名だけで一意なら採用
+    # fallback where the working_dir label does not match (path normalization differences, etc.):
+    # take it when the service name alone is unique
     ids=$(docker ps -q --filter "label=com.docker.compose.service=$svc")
   fi
   n=$(printf '%s\n' "$ids" | grep -c . || true)
@@ -44,10 +45,14 @@ find_container() {
   printf '%s' "$ids"
 }
 
-# compose の -f / --env-file 引数を配列 FARGS に組む。$1 = project working_dir、$2 = config_files ラベル ("," 区切り)、$3 = env file。
-# パスに空白が入り得る (Dev Containers 生成ファイルは "~/Library/Application Support/…") ので、文字列連結ではなく配列で持つ。
-# config_files ラベルがあればそれを使うが、過去に overlay 抜きで作り直されたコンテナはラベルにも overlay が残っていない。
-# relay 構成 (docker-compose.relay.yml が存在する) ならそのファイルを必ず含める。存在しないファイルと重複は飛ばす。
+# Build compose's -f / --env-file arguments into the array FARGS. $1 = the project working_dir,
+# $2 = the config_files label ("," separated), $3 = env file.
+# A path can hold spaces (the Dev Containers generated file lives under
+# "~/Library/Application Support/…"), so keep them in an array rather than concatenating a string.
+# The config_files label is used when it is there, but a container recreated in the past without the
+# overlay has no overlay left in its label either.
+# On a relay setup (docker-compose.relay.yml exists) always include that file. Files that do not exist,
+# and duplicates, are skipped.
 compose_args() {
   local wd=$1 cfgs=$2 envfile=$3 c
   FARGS=()
@@ -93,11 +98,12 @@ case "${1:-}" in
   id)
     find_container "${2:?usage: sgw.sh id <service>}"; echo ;;
   recreate)
-    # gateway を最新イメージで作り直す。docker restart は既存イメージのまま再開するので入れ替わらない。
-    # compose の image タグを上げたあとに使う (Web UI の Relay タブが古い等)。
-    # Dev Containers は複数の compose ファイル (docker-compose.yml + docker-compose.relay.yml + 生成ファイル) を重ねているので、
-    # コンテナのラベル config_files からその全てを -f で渡す。1 つでも欠けると relay overlay (agent socket の
-    # マウント等) が外れて gateway が壊れる。
+    # Recreate the gateway on the latest image. docker restart resumes with the existing image, so it
+    # does not swap.
+    # Use it after bumping the image tag in compose (the Web UI's Relay tab is stale, etc.).
+    # Dev Containers layers several compose files (docker-compose.yml + docker-compose.relay.yml + the
+    # generated one), so pass every one of them with -f, taken from the container's config_files label.
+    # Missing even one drops the relay overlay (the agent socket mount, etc.) and breaks the gateway.
     cid=$(find_container sekimore-gw)
     running=$(docker inspect -f "{{.Config.Image}}" "$cid")
     proj=$(docker inspect -f "{{index .Config.Labels \"com.docker.compose.project\"}}" "$cid")
@@ -105,9 +111,11 @@ case "${1:-}" in
     cfgs=$(docker inspect -f "{{index .Config.Labels \"com.docker.compose.project.config_files\"}}" "$cid")
     envfile=$(docker inspect -f "{{index .Config.Labels \"com.docker.compose.project.environment_file\"}}" "$cid")
     compose_args "$wd" "$cfgs" "$envfile"
-    # pull するのは compose が宣言している image (タグを上げた直後は実行中コンテナの image より新しい)。
-    # compose up は既にあるタグを再 pull しないので、同じタグの更新 (latest 等) もここで取り込む。
-    # compose config が使えない環境では実行中コンテナの image に戻る
+    # What is pulled is the image compose declares (right after a tag bump it is newer than the running
+    # container's image).
+    # compose up does not re-pull a tag it already has, so an update to the same tag (latest, etc.) is
+    # taken in here too.
+    # Where compose config is unavailable, it falls back to the running container's image
     image=$(docker compose -p "$proj" --project-directory "$wd" "${FARGS[@]}" config --images sekimore-gw 2>/dev/null | head -1)
     image=${image:-$running}
     if [ "$image" != "$running" ]; then echo "gateway: $running → $image (project=$proj)"; else echo "gateway: $image (project=$proj)"; fi
@@ -119,7 +127,7 @@ case "${1:-}" in
     echo "after:   $(docker inspect -f "{{.Image}}" "$new")"
     printf "waiting for the gateway"
     for _ in $(seq 1 30); do
-      # gateway に curl は無いので python で叩く (必ず入っている)
+      # the gateway has no curl, so hit it with python (always present)
       if docker exec "$new" python -c "import urllib.request,sys; urllib.request.urlopen(\"http://127.0.0.1:8080/api/config\",timeout=3)" 2>/dev/null; then echo " ok"; break; fi
       printf "."; sleep 1
     done

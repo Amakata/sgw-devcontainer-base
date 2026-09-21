@@ -1,78 +1,80 @@
-# Mac (Docker Desktop) 側の日常操作を `mise run <task>` にまとめる。一覧は `mise tasks`。
-# ホスト側専用 (devcontainer の中の Docker には gateway が居ないので、中では拒否する)。
+# The day-to-day operations on the Mac (Docker Desktop) side, as `mise run <task>`. `mise tasks`
+# lists them. Host-side only: the Docker inside the devcontainer has no gateway, so they refuse
+# to run in there.
 #
-# **`gw:*` はここには無い。** ゲートウェイのイメージが自分の版のタスクを同梱していて、
-# それを include している (0.2.20〜)。だから `mise run gw:unlock` があるかどうかは、
-# 動いているゲートウェイが unlock を持っているかと一致する。コピーだと取り残される:
-# 公開サンプルは `gw:unlock` を4版ぶん欠いたままだった。
+# **`gw:*` is not in here.** The gateway's image ships the tasks for its own version and this
+# file includes them (0.2.20 and later). So whether `mise run gw:unlock` exists matches whether
+# the running gateway has unlock. A copy drifts: the published sample went four releases
+# without `gw:unlock`.
 #
-#   mise run gw:sync-tasks   # イメージからタスクを取り出す。gw:recreate のあとに
-#   mise tasks               # いま何が使えるか
+#   mise run gw:sync-tasks   # take the tasks out of the image; run it after gw:recreate
+#   mise tasks               # what is available right now
 #
-# 順序だけ覚えておく:
+# The order is the part worth remembering:
 #
-#   mise run vscode          # SSH_AUTH_SOCK を渡さずに VS Code を開く (依頼者の鍵を AI に見せない)
-#   mise run gw:unlock       # 秘密ストアの解錠。**これが先**。施錠中は GitHub API が通らない
-#   mise run gw:login        # 初回のみ。解錠より先には実行できない
-#   mise run relay:verify    # 一式の受け入れ確認
+#   mise run vscode          # open VS Code without SSH_AUTH_SOCK (the operator's keys stay away from the AI)
+#   mise run gw:unlock       # unlock the secret store. **This comes first**; locked, the GitHub API does not work
+#   mise run gw:login        # first time only. It cannot run before the unlock
+#   mise run relay:verify    # the acceptance check for the whole set
 
 [task_config]
-# 取り出し済みのファイル。**無くても mise は黙って無視する**ので、`gw:*` が見当たらないときは
-# ここが空か、取り出していないかを疑う (`mise run gw:sync-tasks`)。
+# The file already taken out of the image. **mise ignores it silently when it is missing**, so
+# when `gw:*` is nowhere to be found, suspect that this is empty or was never extracted
+# (`mise run gw:sync-tasks`).
 includes = [".devcontainer/gateway.mise.toml"]
 
 [env]
 SGW = "{{config_root}}/.devcontainer/scripts/sgw.sh"
 
-# ---- ゲートウェイのタスクを取り出す ----
-# これと sgw.sh だけが、イメージから配れずここに残るもの。ゲートウェイを見つけて exec する
-# 側なので、新しいゲートウェイが存在する前に必要になる (鶏と卵)。だから最小にしてある。
+# ---- Taking the gateway's tasks out of the image ----
+# This and sgw.sh are the only things that cannot be shipped from the image and have to stay
+# here. They are the side that finds the gateway and execs into it, so they are needed before a
+# new gateway exists (chicken and egg). That is why they are kept minimal.
 [tasks."gw:sync-tasks"]
-description = "動いているゲートウェイから gw:* タスクを取り出す (gw:recreate のあとに実行する)"
-run = "bash \"$SGW\" gw cat /usr/local/share/sekimore/gateway.mise.ja.toml > \"$MISE_PROJECT_ROOT/.devcontainer/gateway.mise.toml\" && echo 'wrote .devcontainer/gateway.mise.toml — git diff で差分を見てコミットする'"
+description = "take the gw:* tasks out of the running gateway (run it after gw:recreate)"
+run = "bash \"$SGW\" gw cat /usr/local/share/sekimore/gateway.mise.en.toml > \"$MISE_PROJECT_ROOT/.devcontainer/gateway.mise.toml\" && echo 'wrote .devcontainer/gateway.mise.toml — read the diff with git diff, then commit it'"
 
-# ---- 起動 ----
-# ---- 起動 ----
+# ---- Starting up ----
 [tasks.vscode]
-description = "VS Code を SSH_AUTH_SOCK が届かない状態で起動する (launchd の変数を外し、open を通さず直接起動、起動後に本体の環境を確認)"
+description = "start VS Code where SSH_AUTH_SOCK does not reach it (unset the launchd variable, start the app directly rather than through open, and check the app's environment afterwards)"
 run = 'bash "$MISE_PROJECT_ROOT/.devcontainer/scripts/vscode.sh"'
 
 [tasks."vscode:check"]
-description = "launchd / Docker Desktop / 起動中の VS Code の SSH_AUTH_SOCK の状態を表示する"
+description = "show the state of SSH_AUTH_SOCK in launchd, in Docker Desktop and in the running VS Code"
 run = 'bash "$MISE_PROJECT_ROOT/.devcontainer/scripts/vscode.sh" --check'
 
 [tasks."vscode:restore-agent-env"]
-description = "launchd に SSH_AUTH_SOCK を戻す (mise run vscode が外したもの。Docker Desktop を再起動する前に実行)"
+description = "put SSH_AUTH_SOCK back into launchd (the one mise run vscode removed). Run it before restarting Docker Desktop"
 run = 'bash "$MISE_PROJECT_ROOT/.devcontainer/scripts/vscode.sh" --restore-agent-env'
 
 [tasks.web]
-description = "sekimore-gw の Web UI をブラウザで開く"
+description = "open sekimore-gw's web UI in a browser"
 run = 'open "http://localhost:8080" 2>/dev/null || xdg-open "http://localhost:8080"'
 
 [tasks.ps]
-description = "この devcontainer の compose スタックのコンテナ一覧"
+description = "the containers of this devcontainer's compose stack"
 run = 'bash "$SGW" ps'
 
 [tasks.down]
-description = "compose スタックを停止・削除する (volume は残る。VS Code を閉じた後の後片付け)"
+description = "stop and remove the compose stack (the volumes stay). The tidy-up after closing VS Code"
 run = 'docker compose -p "$(bash "$SGW" project)" down'
 
-# ---- dev (AI のサンドボックス) ----
+# ---- dev (the AI's sandbox) ----
 [tasks."dev:shell"]
-description = "dev コンテナのシェル (vscode ユーザー)"
+description = "a shell in the dev container (as the vscode user)"
 run = 'bash "$SGW" dev zsh'
 
 [tasks."dev:agent-setup"]
-description = "dev で agent-setup を再実行 (relay への鍵登録・トークン・known_hosts を作り直す。冪等)"
+description = "run agent-setup again in dev (registers the key with the relay and remakes the token and known_hosts; idempotent)"
 run = 'bash "$SGW" dev sudo /usr/local/bin/sekimore-agent-setup.sh'
 
 [tasks."dev:signing-key"]
-description = "AI の署名用公開鍵を表示 (GitHub の Settings → SSH and GPG keys に Signing Key として登録する)"
+description = "print the AI's signing public key (register it on GitHub under Settings -> SSH and GPG keys as a Signing Key)"
 run = 'bash "$SGW" dev cat /home/vscode/.ssh/sekimore/signing_ed25519.pub'
 
-# ---- 受け入れ確認 ----
+# ---- The acceptance check ----
 [tasks."relay:verify"]
-description = "relay の受け入れ確認: gateway の状態 / dev に依頼者の agent が届いていないこと / dev から関所経由の git"
+description = "the relay's acceptance check: the gateway's state, that the operator's agent does not reach dev, and git through the relay from dev"
 run = '''
 set -u
 fail=0

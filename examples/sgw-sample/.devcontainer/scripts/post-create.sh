@@ -65,32 +65,33 @@ sed -i 's/^plugins=(git)$/plugins=(git zsh-completions zsh-autosuggestions zsh-s
 
 
 # ---------------------------------------------------------------------------
-# sekimore-relay guardrail: 操作者 (人間) の SSH 鍵 = ssh-agent は、この AI 用コンテナから使えてはいけない。
-# relay 構成では GitHub への認証は sekimore-gw の中で行う。ここで ssh-agent が見えるなら鍵伝搬の反転が
-# 成立していないので、エラーで止めて Mac 側の手順を案内する (design D-6)。
-# VS Code Dev Containers 拡張は、VS Code 本体が ssh-agent を使える状態だと必ずコンテナへ転送する
-# (止める設定なし: microsoft/vscode-remote-release#11413)。
+# sekimore-relay guardrail: the operator's (a human's) SSH key - the ssh-agent - must not be usable
+# from this AI container. Under the relay setup, authentication to GitHub happens inside sekimore-gw.
+# An ssh-agent visible here means the reversal of key propagation is not in place, so stop with an
+# error and point at the steps to take on the Mac (design D-6).
+# The VS Code Dev Containers extension always forwards the agent into the container whenever VS Code
+# itself can use one (no setting turns it off: microsoft/vscode-remote-release#11413).
 # ---------------------------------------------------------------------------
 if ssh-add -l >/dev/null 2>&1; then
   if [ "${SEKIMORE_ALLOW_AGENT_FORWARD:-0}" = "1" ]; then
-    echo "⚠️  あなたの Mac の SSH 鍵 (ssh-agent) がこのコンテナから使える状態です。SEKIMORE_ALLOW_AGENT_FORWARD=1 のため続行しますが、AI があなたの鍵を使えます。"
+    echo "⚠️  Your Mac's SSH key (ssh-agent) is usable from this container. Continuing because SEKIMORE_ALLOW_AGENT_FORWARD=1, but the AI can use your key."
   else
     {
       echo ""
-      echo "❌ 起動を中止しました: あなたの Mac の SSH 鍵 (ssh-agent) が、この開発コンテナから使える状態になっています。"
-      echo "   この構成では、コンテナ内の AI にあなたの鍵を使わせません。GitHub への認証は sekimore-gw が代わりに行います。"
+      echo "❌ Start-up aborted: your Mac's SSH key (ssh-agent) is usable from this dev container."
+      echo "   This setup does not let the AI inside the container use your key. sekimore-gw authenticates to GitHub instead."
       echo ""
-      echo "   直し方 (Mac 側で、この順に):"
-      echo "     1. VS Code を Cmd+Q で完全に終了する"
-      echo "     2. Terminal.app で実行する (VS Code の中のターミナルは不可):"
-      echo "          cd <このプロジェクトのフォルダ> && mise run vscode"
-      echo "        → VS Code が「SSH 鍵を使えない状態」で起動します"
-      echo "     3. その VS Code で「Dev Containers: Reopen in Container」を実行する"
-      echo "     4. 確認: コンテナ内で ssh-add -l が失敗 (Could not open a connection to your authentication agent) すれば OK"
+      echo "   How to fix it (on the Mac, in this order):"
+      echo "     1. Quit VS Code completely with Cmd+Q"
+      echo "     2. Run this in Terminal.app (a terminal inside VS Code will not do):"
+      echo "          cd <this project's folder> && mise run vscode"
+      echo "        -> VS Code starts with no access to the SSH key"
+      echo "     3. In that VS Code, run \"Dev Containers: Reopen in Container\""
+      echo "     4. Check: inside the container ssh-add -l should fail (Could not open a connection to your authentication agent)"
       echo ""
-      echo "   なぜ: VS Code の Dev Containers 拡張は、VS Code 自身が SSH 鍵を使える状態だとコンテナへ必ず転送します (止める設定なし)。"
-      echo "        mise run vscode は VS Code だけに SSH 鍵を見せずに起動します。Docker Desktop (sekimore-gw に鍵を渡す側) には影響しません。"
-      echo "   一時的に無視して起動したい場合: .devcontainer/.env に SEKIMORE_ALLOW_AGENT_FORWARD=1 を書いて Rebuild (非推奨)"
+      echo "   Why: the VS Code Dev Containers extension always forwards the key into the container when VS Code itself can use it (no setting turns it off)."
+      echo "        mise run vscode starts VS Code alone without showing it the SSH key. Docker Desktop (which hands the key to sekimore-gw) is unaffected."
+      echo "   To ignore this and start anyway: put SEKIMORE_ALLOW_AGENT_FORWARD=1 in .devcontainer/.env and Rebuild (not recommended)"
       echo ""
     } >&2
     exit 1
@@ -98,17 +99,21 @@ if ssh-add -l >/dev/null 2>&1; then
 fi
 
 # ---------------------------------------------------------------------------
-# sekimore-relay guardrail (その 2): HTTPS git が依頼者の GitHub 認証を借りる経路を塞ぐ。
-# VS Code Dev Containers 拡張は 2 つの経路を仕込む:
-#   (a) git の credential.helper を /etc/gitconfig と ~/.gitconfig に書く
-#   (b) GIT_ASKPASS + VSCODE_GIT_IPC_HANDLE を各シェルの環境に注入する (git の HTTP Basic 認証で使う)
-# どちらも https://github.com/... の clone/push を関所を迂回して依頼者の権限で通してしまう。
-# relay 構成では git は関所の SSH 経由に限りたいので両方を無効化する。git@github.com (SSH) は影響なし。
-#   - (a) はここで消す (devcontainer.json では無効化できない。拡張が毎回書くので起動ごとに打ち消す)
-#   - (b) は rc.d/70-sekimore.zsh が GIT_ASKPASS='' にして無力化する (対話シェル)。
-#         非対話の tool 呼び出し向けに、ここで git の core.askpass は空にできないため
-#         (env が勝つ)、helper を消すことと SSH 経路への一本化で守る。
-# 一時的に元へ戻すなら SEKIMORE_ALLOW_CREDENTIAL_HELPER=1。
+# sekimore-relay guardrail (part 2): close the route by which HTTPS git borrows the requester's
+# GitHub authentication. The VS Code Dev Containers extension plants two of them:
+#   (a) it writes git's credential.helper into /etc/gitconfig and ~/.gitconfig
+#   (b) it injects GIT_ASKPASS + VSCODE_GIT_IPC_HANDLE into every shell's environment (used by git's
+#       HTTP Basic authentication)
+# Either one lets a clone/push of https://github.com/... through with the requester's permissions,
+# around the gateway. Under the relay setup git is meant to go only over the gateway's SSH, so both
+# are disabled. git@github.com (SSH) is unaffected.
+#   - (a) is removed here (it cannot be disabled in devcontainer.json. The extension writes it every
+#     time, so it is undone on every start-up)
+#   - (b) is defused by rc.d/70-sekimore.zsh setting GIT_ASKPASS='' (interactive shells).
+#         For non-interactive tool invocations git's core.askpass cannot be emptied here
+#         (the environment wins), so the protection is removing the helper and funnelling
+#         everything through the SSH route.
+# To put it back temporarily, SEKIMORE_ALLOW_CREDENTIAL_HELPER=1.
 # ---------------------------------------------------------------------------
 disable_vscode_credential_helper() {
   local scope changed=0 cur
@@ -121,7 +126,7 @@ disable_vscode_credential_helper() {
         changed=1 ;;
     esac
   done
-  [ "$changed" = 1 ] && echo "[agent] relay: disabled the VS Code HTTPS git credential helper (git は関所の SSH 経由に。SEKIMORE_ALLOW_CREDENTIAL_HELPER=1 で残せる)"
+  [ "$changed" = 1 ] && echo "[agent] relay: disabled the VS Code HTTPS git credential helper (git now goes over the gateway's SSH; keep it with SEKIMORE_ALLOW_CREDENTIAL_HELPER=1)"
 }
 if [ "${SEKIMORE_ALLOW_CREDENTIAL_HELPER:-0}" != "1" ]; then
   disable_vscode_credential_helper
