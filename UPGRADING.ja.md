@@ -1,3 +1,4 @@
+<!-- reviewed-up-to: 0.2.20 -->
 # 更新のしかた (版ごとに必要な作業)
 
 *[English](UPGRADING.md)*
@@ -122,3 +123,28 @@ git の push / pull は SSH なので影響しません。
 
 同じ版で、上流が既に広告しているタグを動かす push が拒否されるようになりました。
 **新しいタグを切るのは今までどおり**なので、リリース手順は変わりません。
+
+## 0.2.20 タスクが gateway から来るようになった
+
+**任意。ただし一度やる価値がある。** イメージが `gw:*` タスクを持つようになったので、
+プロジェクト側で複製を抱える必要がなくなりました:
+
+```bash
+docker exec sekimore-gw cat /usr/local/share/sekimore/gateway.mise.ja.toml \
+  > .devcontainer/gateway.mise.toml      # .en.toml でもよい。違うのは `mise tasks` の表示だけ
+```
+
+```toml
+# mise.toml — gw:* のタスクは消して、自分のタスクだけ残す
+[task_config]
+includes = [".devcontainer/gateway.mise.toml"]
+
+[env]
+SGW = "{{config_root}}/.devcontainer/scripts/sgw.sh"
+```
+
+`mise run gw:recreate` のたびに取り直せば、タスクは常に動いている gateway のものになります。
+上の 0.2.15 と 0.2.19 が罠になっていた原因は、これで消えます。
+
+`sgw.sh` は引き続きあなたのもので、`gw-tty` が要ります。同梱ファイルの冒頭に、
+どの原始的な口を使うか4つ書いてあります。
