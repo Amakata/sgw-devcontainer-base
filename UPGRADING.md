@@ -1,4 +1,4 @@
-<!-- reviewed-up-to: 0.2.20 -->
+<!-- reviewed-up-to: 0.2.26 -->
 # Upgrading (what each release asks of you)
 
 *[日本語版](UPGRADING.ja.md)*
@@ -28,6 +28,7 @@ is the whole upgrade. What changed is in the changelogs —
 | 0.1.9 – 0.2.6 | [0.2.7](#027-declare-your-projects-boards-breaking) onward |
 | 0.2.7 – 0.2.14 | [0.2.15](#0215-a-secret-store-appeared) onward |
 | 0.2.15 – 0.2.18 | [0.2.19](#0219-unlocking-became-required) |
+| 0.2.19 – 0.2.21 | [0.2.22](#0222-the-proxy-credential-moved-into-the-store) — **only if your upstream proxy needs a password** |
 
 ---
 
@@ -172,3 +173,32 @@ names the four primitives it uses in its header.
 missing** — no error, no warning — so gitignoring it would leave every `gw:*`
 task quietly not existing for whoever clones next. Committing it also means a
 gateway upgrade shows up in `git diff`, which is the only place it is visible.
+
+## 0.2.22 the proxy credential moved into the store
+
+**Only for a gateway behind a corporate proxy that asks for a password.**
+Everyone else: nothing to do.
+
+`upstream_proxy_username` / `upstream_proxy_password` in `config.yml`, and the
+`SEKIMORE_UPSTREAM_PROXY_*` variables, are readable from the dev container —
+`config.yml` sits in the worktree and `.devcontainer/.env` is the agent's own
+`env_file`. The credential belongs in the secret store:
+
+```bash
+mise run gw:proxy-credential -- set     # asks for the username and password on the terminal
+```
+
+Then remove the two keys from `config.yml` and the two variables from wherever
+they were set, and `mise run gw:recreate`. Both are **still read** if left in
+place, so this is not a breaking change; it is the removal that closes the hole.
+
+Two things follow from the store being sealed at start-up:
+
+- Squid runs **without** upstream authentication until `mise run gw:unlock`,
+  and picks the credential up on its own once the store opens. Behind a proxy
+  that rejects anonymous requests, the gateway still starts — nothing in it
+  goes through the proxy before unlock
+- `gw:proxy-credential` is a gateway task: it arrives through the include
+  ([0.2.20](#0220-tasks-come-from-the-gateway-now)) after `mise run gw:sync-tasks`
+
+0.2.21 and 0.2.23 – 0.2.26 ask nothing of you.
