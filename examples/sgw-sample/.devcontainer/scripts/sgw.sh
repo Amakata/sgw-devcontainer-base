@@ -5,6 +5,7 @@
 #   sgw.sh gw   [cmd...]   run cmd in the sekimore-gw container (default: sekimore-relay check)
 #   sgw.sh dev  [cmd...]   run cmd in the dev container (as the vscode user. default: zsh)
 #   sgw.sh id   <service>  print the container ID
+#   sgw.sh port <service> [container-port]  print the published host port (default: 8080)
 #   sgw.sh project         print the compose project name (Dev Containers: "<folder name>_devcontainer")
 #   sgw.sh ps              list the stack's containers
 #   sgw.sh recreate        pull the latest image and recreate the gateway (docker restart keeps the old one)
@@ -97,6 +98,17 @@ case "${1:-}" in
     exec docker exec "$(tty_flag)" -u vscode "$cid" "$@" ;;
   id)
     find_container "${2:?usage: sgw.sh id <service>}"; echo ;;
+  # Ask the running container which host port it listens on. Not the compose file, because a
+  # project moves the published port when 8090 is taken, and a number written into a task drifts
+  # from it the moment that happens. The running container cannot disagree with itself.
+  port)
+    svc=${2:?usage: sgw.sh port <service> [container-port]}
+    cport=${3:-8080}
+    cid=$(find_container "$svc")
+    hp=$(docker port "$cid" "$cport" 2>/dev/null | head -1)
+    [ -n "$hp" ] || { echo "sgw: service '$svc' publishes no host port for $cport" >&2; exit 1; }
+    # take the number out of "0.0.0.0:8091" or "[::]:8091"
+    printf '%s\n' "${hp##*:}" ;;
   recreate)
     # Recreate the gateway on the latest image. docker restart resumes with the existing image, so it
     # does not swap.
@@ -138,5 +150,7 @@ case "${1:-}" in
   ps)
     docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}' --filter "label=com.docker.compose.project.working_dir=$COMPOSE_DIR" ;;
   *)
-    sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 2 ;;
+    # Print the leading comment block until it runs out. Cutting it at a line number drops the
+    # last subcommand silently as soon as one line of usage is added (adding port nearly did).
+    sed -n '2,${/^#/!q;s/^# \{0,1\}//;p;}' "$0" >&2; exit 2 ;;
 esac

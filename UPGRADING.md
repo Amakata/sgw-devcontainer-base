@@ -411,3 +411,27 @@ Turn it on only after step 5 works: with it on and no key, every push is refused
 relay asks the upstream whether it already holds that commit — a commit hidden behind a
 delta looks the same from inside the pack otherwise. So the gateway has to be unlocked
 (`mise run gw:unlock`) and logged in, or pushes fail closed with a message saying which.
+
+## base 0.2.19 `mise run web` finds the port itself
+
+**Optional.** Nothing breaks if you skip it — until you move the Web UI's
+published port, which is when the old `web` task goes to the wrong place.
+
+The task had the port written into it as a literal while the compose file is
+what actually decides it. A project that already has 8090 taken moves the
+published port, the task keeps opening the old number, and `mise run web` lands
+on nothing — or on another project's gateway, which is worse.
+
+This one is not keyed to a gateway version: it is the sample's own files, and
+the gateway is unchanged.
+
+Take both from the sample — `sgw.sh` gains a `port` branch and `mise.toml`'s
+`web` task calls it:
+
+```bash
+diff -u <base>/examples/sgw-sample/.devcontainer/scripts/sgw.sh .devcontainer/scripts/sgw.sh
+diff -u <base>/examples/sgw-sample/mise.toml mise.toml
+```
+
+Then `mise run web` prints the URL it opens, so a wrong port is visible rather
+than silent.
