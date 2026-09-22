@@ -22,6 +22,7 @@ bottom.
 ### Fix
 
 - the sample devcontainer takes gateway 0.2.29 — the one this image takes — instead of the 0.2.19 it was pinned to, its comments are English throughout as the rest of the sample has been since 0.2.18, and `gw:sync-tasks` pulls the English task file out of the image, so the `gateway.mise.toml` committed beside it is 0.2.29's and has `gw:unlock-auto` (#41)
+- `mise run web` opens the port the gateway actually publishes, read off the running container through the new `sgw.sh port <service> [container-port]`, instead of a number written into the task. The sample publishes `8080:8080` so its literal was right, which is what hid this: it breaks once a project moves the port because 8090 is taken, which is what a sample is copied in order to do (#42)
 
 ## 0.2.18 (2026-09-21)
 
