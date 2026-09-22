@@ -389,3 +389,27 @@ relay:
 上流が既に持っているかを問い合わせるためです（そうしないと、delta に隠れたコミットと
 上流の履歴が pack の中から区別できません）。解錠（`mise run gw:unlock`）と login が
 できていないと push は拒否されます。拒否のメッセージがどちらかを言います。
+
+## base 0.2.19 `mise run web` が自分でポートを引く
+
+**任意。** 飛ばしても壊れません。壊れるのは Web UI の公開ポートをずらしたときで、
+古い `web` task はそこで違う場所を開きます。
+
+task にポートが直書きされていた一方、実際に決めているのは compose です。8090 が
+既に埋まっているプロジェクトは公開ポートをずらしますが、task は古い数字を開き続け、
+`mise run web` は何も無い場所に行き着きます。他のプロジェクトの gateway に当たると、
+そちらのほうが厄介です。
+
+これは gateway の版に紐づきません。サンプル自身のファイルの話で、gateway は変わって
+いません。
+
+サンプルから両方を取ってください。`sgw.sh` に `port` の枝が増え、`mise.toml` の
+`web` task がそれを呼びます。
+
+```bash
+diff -u <base>/examples/sgw-sample/.devcontainer/scripts/sgw.sh .devcontainer/scripts/sgw.sh
+diff -u <base>/examples/sgw-sample/mise.toml mise.toml
+```
+
+以後 `mise run web` は開く URL を表示します。ポートが違っていれば黙って外れるのでは
+なく、目に見えます。
