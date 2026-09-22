@@ -49,7 +49,16 @@ run = 'bash "$MISE_PROJECT_ROOT/.devcontainer/scripts/vscode.sh" --restore-agent
 
 [tasks.web]
 description = "open sekimore-gw's web UI in a browser"
-run = 'open "http://localhost:8080" 2>/dev/null || xdg-open "http://localhost:8080"'
+# The port comes from the running container. A number written here drifts from the compose file
+# as soon as a project moves the published port (8090 taken, so 8091).
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+port=$(bash "$SGW" port sekimore-gw 8080)
+url="http://localhost:$port"
+echo "$url"
+open "$url" 2>/dev/null || xdg-open "$url"
+'''
 
 [tasks.ps]
 description = "the containers of this devcontainer's compose stack"
