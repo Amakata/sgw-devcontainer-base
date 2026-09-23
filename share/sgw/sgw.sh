@@ -113,14 +113,18 @@ compose_args() {
 }
 
 
-tty_flag() { if [ -t 0 ] && [ -t 1 ]; then echo "-it"; else echo "-i"; fi; }
+# -t only when both ends are the person's terminal: an interactive shell needs it, and output piped
+# on (relay:verify's `| sed`) must not get the carriage returns a pty adds. Decided here, in this
+# shell: asked inside "$(...)", stdout is the substitution's pipe, so the old tty_flag function
+# always answered "no terminal" and interactive shells started without one, waiting on stdin (#50).
+if [ -t 0 ] && [ -t 1 ]; then TTY_OPT=-it; else TTY_OPT=-i; fi
 
 case "${1:-}" in
   gw)
     shift; cid=$(find_container sekimore-gw)
     if [ $# -eq 0 ]; then set -- sekimore-relay check; fi
-    exec docker exec "$(tty_flag)" "$cid" "$@" ;;
-  # Always -it, for a command that reads a passphrase. tty_flag asks for stdout as well, and a
+    exec docker exec "$TTY_OPT" "$cid" "$@" ;;
+  # Always -it, for a command that reads a passphrase. the plain `gw` asks for stdout as well, and a
   # task runner that prefixes output makes stdout a pipe — so the detection says "no terminal"
   # while the person is sitting at one. What matters here is stdin, and asking for a terminal we
   # do not need costs nothing: docker only refuses -t when stdin itself is not one.
@@ -131,7 +135,7 @@ case "${1:-}" in
   dev)
     shift; cid=$(find_container dev)
     if [ $# -eq 0 ]; then set -- zsh; fi
-    exec docker exec "$(tty_flag)" -u vscode "$cid" "$@" ;;
+    exec docker exec "$TTY_OPT" -u vscode "$cid" "$@" ;;
   id)
     find_container "${2:?usage: sgw.sh id <service>}"; echo ;;
   # Ask the running container which host port it listens on. Not the compose file, because a

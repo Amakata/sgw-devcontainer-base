@@ -17,6 +17,12 @@ Starts at 0.2.18. Releases before it are not written up here; the pull requests
 and the tag on each are the record. The gateway each of them took is at the
 bottom.
 
+## 0.2.25 (2026-09-23)
+
+### Fix
+
+- `sgw.sh` gives `docker exec` a terminal when the person has one, so `mise run dev:shell` opens a shell instead of hanging; it chose the flag inside `$(...)`, where stdout is always a pipe (#55)
+
 ## 0.2.24 (2026-09-23)
 
 ### Fix

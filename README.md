@@ -73,7 +73,7 @@ The smallest possible use is:
 
 ```dockerfile
 # a version, not latest: `mise run upgrade` reads it and moves it
-FROM ghcr.io/amakata/sgw-devcontainer-base:0.2.24
+FROM ghcr.io/amakata/sgw-devcontainer-base:0.2.25
 
 # only what this project adds
 # e.g. mise use -g python@3.13.0 && mise reshim
