@@ -7,6 +7,7 @@
 #   upgrade.sh --apply --yes  the same, without asking before recreating the gateway
 #   upgrade.sh --sync       bring .devcontainer/sgw/ in line with the versions already pinned
 #   upgrade.sh --notes      print the UPGRADING sections between the pinned versions and the newest
+#   upgrade.sh --owned      only what your own files (mise.toml, devcontainer.json, …) need; no network
 #
 # The versions are the gateway's `image:` tag in .devcontainer/docker-compose.yml and the base's `FROM` tag in
 # .devcontainer/Dockerfile. The newest is the highest X.Y.Z tag on GHCR — what can actually be pulled.
@@ -60,8 +61,8 @@ msg() {
     *:inside) echo 'upgrade: this is the inside of the dev container; run it on the host (Mac).' ;;
     ja:need) echo 'upgrade: %s が見つかりません' ;;
     *:need) echo 'upgrade: %s not found' ;;
-    ja:usage) echo '使い方: upgrade.sh [--apply [--yes] | --sync | --notes]' ;;
-    *:usage) echo 'usage: upgrade.sh [--apply [--yes] | --sync | --notes]' ;;
+    ja:usage) echo '使い方: upgrade.sh [--apply [--yes] | --sync | --notes | --owned]' ;;
+    *:usage) echo 'usage: upgrade.sh [--apply [--yes] | --sync | --notes | --owned]' ;;
     ja:unpinned) echo 'upgrade: %s の %s が X.Y.Z のタグで固定されていません (latest やダイジェスト)。版を書いてから実行してください。' ;;
     *:unpinned) echo 'upgrade: %s in %s is not pinned to an X.Y.Z tag (latest, or a digest). Write a version there first.' ;;
     ja:no_newest) echo 'upgrade: %s の最新の版を GHCR から取れませんでした' ;;
@@ -124,6 +125,8 @@ msg() {
     *:unlock_try) echo 'the gateway'"'"'s secret store is "%s"; trying gw:unlock-auto' ;;
     ja:owned_hdr) echo 'あなたのファイルで要る変更 (upgrade はここを書き換えません)' ;;
     *:owned_hdr) echo 'What your own files need (upgrade does not write these)' ;;
+    ja:owned_none) echo 'あなたのファイルで要る変更: なし' ;;
+    *:owned_none) echo 'What your own files need: nothing' ;;
     ja:remain) echo '残り (人がやること)' ;;
     *:remain) echo 'What is left (for you)' ;;
     ja:r_recreate) echo 'gateway を作り直す: mise run gw:recreate' ;;
@@ -158,6 +161,7 @@ while [ $# -gt 0 ]; do
     --apply) MODE=apply ;;
     --sync) MODE=sync ;;
     --notes) MODE=notes ;;
+    --owned) MODE=owned ;;
     --yes) YES=1 ;;
     *) say usage >&2; exit 2 ;;
   esac
@@ -178,6 +182,53 @@ fi
 
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/sgw-upgrade.XXXXXX")
 trap 'rm -rf "$TMP"' EXIT INT TERM
+
+# ---- what the project's own files need ----
+# Collected into REMAIN; never written. A function, so that `--owned` can run it alone.
+REMAIN=
+remain() { REMAIN="$REMAIN$1
+"; }
+collect_owned() {
+  # mise.toml is the user's: say what it needs, never write it
+  M=$ROOT/mise.toml
+  if ! grep -q '\.devcontainer/sgw/tasks\.mise\.toml' "$M" 2>/dev/null ||
+     ! grep -q '\.devcontainer/sgw/gateway\.mise\.toml' "$M" 2>/dev/null ||
+     ! grep -q '^[[:space:]]*SGW[[:space:]]*=.*\.devcontainer/sgw/sgw\.sh' "$M" 2>/dev/null; then
+    remain "$(msg r_include)
+        [task_config]
+        includes = [\".devcontainer/sgw/tasks.mise.toml\", \".devcontainer/sgw/gateway.mise.toml\"]
+
+        [env]
+        SGW = \"{{config_root}}/.devcontainer/sgw/sgw.sh\""
+  fi
+  # devcontainer.json is the user's too. Its postStartCommand used to name the variables agent-setup
+  # needs in --preserve-env=, a list that fell behind whenever agent-setup gained one; post-start.sh
+  # passes them all. Say so until the project runs it.
+  DCJ=$ROOT/.devcontainer/devcontainer.json
+  if [ -f "$DCJ" ] && grep -q 'sekimore-agent-setup' "$DCJ" && ! grep -q '\.devcontainer/sgw/post-start\.sh' "$DCJ"; then
+    remain "$(msg r_poststart)
+        \"postStartCommand\": \"sh /workspace/.devcontainer/sgw/post-start.sh\","
+  fi
+  # the layout before .devcontainer/sgw/
+  LEFT=
+  for old in .devcontainer/scripts/sgw.sh .devcontainer/scripts/vscode.sh .devcontainer/gateway.mise.toml; do
+    [ -e "$ROOT/$old" ] && LEFT="$LEFT $old"
+  done
+  [ -z "$LEFT" ] || remain "$(say r_leftover "${LEFT# }")"
+}
+
+# `--owned`: only what the project's own files need. No network: the apply that replaced this file
+# runs it last, so the checks of the version it moved to are the ones that speak (#53).
+if [ "$MODE" = owned ]; then
+  collect_owned
+  if [ -n "$REMAIN" ]; then
+    say owned_hdr
+    printf '%s' "$REMAIN" | sed 's/^\([^ ]\)/  - \1/'
+  else
+    say owned_none
+  fi
+  exit 0
+fi
 
 # ---- versions ----
 # re <text>: <text> as a literal inside a sed basic regular expression
@@ -387,36 +438,14 @@ if [ "$CUR_GW" = "$NEW_GW" ] && [ "$CUR_BASE" = "$NEW_BASE" ] && [ -z "$CHANGED"
   UP_TO_DATE=1
 fi
 
-REMAIN=
-remain() { REMAIN="$REMAIN$1
-"; }
 
-# mise.toml is the user's: say what it needs, never write it
-M=$ROOT/mise.toml
-if ! grep -q '\.devcontainer/sgw/tasks\.mise\.toml' "$M" 2>/dev/null ||
-   ! grep -q '\.devcontainer/sgw/gateway\.mise\.toml' "$M" 2>/dev/null ||
-   ! grep -q '^[[:space:]]*SGW[[:space:]]*=.*\.devcontainer/sgw/sgw\.sh' "$M" 2>/dev/null; then
-  remain "$(msg r_include)
-      [task_config]
-      includes = [\".devcontainer/sgw/tasks.mise.toml\", \".devcontainer/sgw/gateway.mise.toml\"]
-
-      [env]
-      SGW = \"{{config_root}}/.devcontainer/sgw/sgw.sh\""
+# #53: when this run replaces upgrade.sh itself, the new one reports this part at the end instead —
+# it may know of changes to your files that this one, written for an older release, does not.
+SELF_REPLACED=0
+if [ "$MODE" != check ]; then
+  case " $CHANGED " in *" upgrade.sh "*) SELF_REPLACED=1 ;; esac
 fi
-# devcontainer.json is the user's too. Its postStartCommand used to name the variables agent-setup
-# needs in --preserve-env=, a list that fell behind whenever agent-setup gained one; post-start.sh
-# passes them all. Say so until the project runs it.
-DCJ=$ROOT/.devcontainer/devcontainer.json
-if [ -f "$DCJ" ] && grep -q 'sekimore-agent-setup' "$DCJ" && ! grep -q '\.devcontainer/sgw/post-start\.sh' "$DCJ"; then
-  remain "$(msg r_poststart)
-      \"postStartCommand\": \"sh /workspace/.devcontainer/sgw/post-start.sh\","
-fi
-# the layout before .devcontainer/sgw/
-LEFT=
-for old in .devcontainer/scripts/sgw.sh .devcontainer/scripts/vscode.sh .devcontainer/gateway.mise.toml; do
-  [ -e "$ROOT/$old" ] && LEFT="$LEFT $old"
-done
-[ -z "$LEFT" ] || remain "$(say r_leftover "${LEFT# }")"
+[ "$SELF_REPLACED" = 1 ] || collect_owned
 
 if [ "$MODE" = check ]; then
   # What the project's own files need is said here too, not only after an apply: a check is where
@@ -515,4 +544,10 @@ if [ -n "$REMAIN" ]; then
   printf '%s' "$REMAIN" | sed 's/^\([^ ]\)/  - \1/'
 else
   echo "  $(msg r_none)"
+fi
+# This run replaced upgrade.sh: ask the new one what your files need (#53). exec, because nothing
+# of this run is left to do, and the old code should not have the last word.
+if [ "$SELF_REPLACED" = 1 ]; then
+  echo
+  exec bash "$SGW_DIR/upgrade.sh" --owned
 fi

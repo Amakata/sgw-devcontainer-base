@@ -17,6 +17,12 @@ Starts at 0.2.18. Releases before it are not written up here; the pull requests
 and the tag on each are the record. The gateway each of them took is at the
 bottom.
 
+## 0.2.24 (2026-09-23)
+
+### Fix
+
+- an apply or sync that replaces `upgrade.sh` ends by running the new one with `--owned`, so what a new release asks of your own files shows on the apply that brings it, not a run later (#54)
+
 ## 0.2.23 (2026-09-23)
 
 ### Fix

@@ -342,6 +342,20 @@ printf '{ "postStartCommand": "sh /workspace/.devcontainer/sgw/post-start.sh" }\
 up "$P" --sync
 hasnt "$LOG/out" "postStartCommand"
 
+echo "== an apply that replaces upgrade.sh lets the new one say what your files need"
+# The release moved to carries a rule the running upgrade.sh has never heard of. Without the hand-off
+# it would only show on the next run (#53).
+sed 's/^collect_owned() {$/collect_owned() {\n  remain "a rule only the new upgrade.sh knows"/' "$UPGRADE" > "$B/v0.2.20/share/sgw/upgrade.sh"
+P=$TMP/p11; new_project "$P"; up "$P" --sync
+printf '{ "postStartCommand": "sudo /usr/local/bin/sekimore-agent-setup.sh" }\n' > "$P/.devcontainer/devcontainer.json"
+up "$P" --apply
+[ "$RC" = 0 ] || { cat "$LOG/err"; fail "apply exited $RC"; }
+has "$LOG/out" "a rule only the new upgrade.sh knows"
+has "$LOG/out" "What your own files need"
+# said once, by the new script, not once by each
+[ "$(grep -c 'sgw/post-start.sh",' "$LOG/out")" = 1 ] || { cat "$LOG/out"; fail "the postStartCommand line was not said exactly once"; }
+cp "$UPGRADE" "$B/v0.2.20/share/sgw/upgrade.sh"
+
 echo "== unpinned, and inside the dev container"
 P=$TMP/p9; new_project "$P"
 printf 'FROM ghcr.io/amakata/sgw-devcontainer-base:latest\n' > "$P/.devcontainer/Dockerfile"
