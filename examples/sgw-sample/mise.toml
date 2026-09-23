@@ -1,14 +1,16 @@
 # The day-to-day operations on the Mac (Docker Desktop) side, as `mise run <task>`. `mise tasks`
-# lists them. Host-side only: the Docker inside the devcontainer has no gateway, so they refuse
-# to run in there.
+# lists them.
 #
-# **`gw:*` is not in here.** The gateway's image ships the tasks for its own version and this
-# file includes them (0.2.20 and later). So whether `mise run gw:unlock` exists matches whether
-# the running gateway has unlock. A copy drifts: the published sample went four releases
-# without `gw:unlock`.
+# **This file is yours; .devcontainer/sgw/ is not.** The tasks come from two files there:
 #
-#   mise run gw:sync-tasks   # take the tasks out of the image; run it after gw:recreate
-#   mise tasks               # what is available right now
+#   .devcontainer/sgw/tasks.mise.toml    the host-side tasks (vscode, web, relay:verify, upgrade …)
+#   .devcontainer/sgw/gateway.mise.toml  the gateway's own tasks (gw:*), for the version it runs
+#
+# `mise run upgrade:apply` replaces both, with sgw.sh beside them. Put your own tasks here; a task
+# here with the same name as one of those wins, so this is also where a changed task goes.
+#
+#   mise run upgrade         # is anything newer? (changes nothing)
+#   mise run upgrade:apply   # move to it
 #
 # The order is the part worth remembering:
 #
@@ -18,97 +20,14 @@
 #   mise run relay:verify    # the acceptance check for the whole set
 
 [task_config]
-# The file already taken out of the image. **mise ignores it silently when it is missing**, so
-# when `gw:*` is nowhere to be found, suspect that this is empty or was never extracted
-# (`mise run gw:sync-tasks`).
-includes = [".devcontainer/gateway.mise.toml"]
+# mise ignores an include that is missing, silently. When the tasks are nowhere to be found,
+# .devcontainer/sgw/ is empty: `bash .devcontainer/sgw/upgrade.sh --sync` fills it.
+includes = [".devcontainer/sgw/tasks.mise.toml", ".devcontainer/sgw/gateway.mise.toml"]
 
 [env]
-SGW = "{{config_root}}/.devcontainer/scripts/sgw.sh"
-
-# ---- Taking the gateway's tasks out of the image ----
-# This and sgw.sh are the only things that cannot be shipped from the image and have to stay
-# here. They are the side that finds the gateway and execs into it, so they are needed before a
-# new gateway exists (chicken and egg). That is why they are kept minimal.
-[tasks."gw:sync-tasks"]
-description = "take the gw:* tasks out of the running gateway (run it after gw:recreate)"
-run = "bash \"$SGW\" gw cat /usr/local/share/sekimore/gateway.mise.en.toml > \"$MISE_PROJECT_ROOT/.devcontainer/gateway.mise.toml\" && echo 'wrote .devcontainer/gateway.mise.toml — read the diff with git diff, then commit it'"
-
-# ---- Starting up ----
-[tasks.vscode]
-description = "start VS Code where SSH_AUTH_SOCK does not reach it (unset the launchd variable, start the app directly rather than through open, and check the app's environment afterwards)"
-run = 'bash "$MISE_PROJECT_ROOT/.devcontainer/scripts/vscode.sh"'
-
-[tasks."vscode:check"]
-description = "show the state of SSH_AUTH_SOCK in launchd, in Docker Desktop and in the running VS Code"
-run = 'bash "$MISE_PROJECT_ROOT/.devcontainer/scripts/vscode.sh" --check'
-
-[tasks."vscode:restore-agent-env"]
-description = "put SSH_AUTH_SOCK back into launchd (the one mise run vscode removed). Run it before restarting Docker Desktop"
-run = 'bash "$MISE_PROJECT_ROOT/.devcontainer/scripts/vscode.sh" --restore-agent-env'
-
-[tasks.web]
-description = "open sekimore-gw's web UI in a browser"
-# The port comes from the running container. A number written here drifts from the compose file
-# as soon as a project moves the published port (8090 taken, so 8091).
-run = '''
-#!/usr/bin/env bash
-set -euo pipefail
-port=$(bash "$SGW" port sekimore-gw 8080)
-url="http://localhost:$port"
-echo "$url"
-open "$url" 2>/dev/null || xdg-open "$url"
-'''
-
-[tasks.ps]
-description = "the containers of this devcontainer's compose stack"
-run = 'bash "$SGW" ps'
-
-[tasks.down]
-description = "stop and remove the compose stack (the volumes stay). The tidy-up after closing VS Code"
-run = 'docker compose -p "$(bash "$SGW" project)" down'
-
-# ---- dev (the AI's sandbox) ----
-[tasks."dev:shell"]
-description = "a shell in the dev container (as the vscode user)"
-run = 'bash "$SGW" dev zsh'
-
-[tasks."dev:agent-setup"]
-description = "run agent-setup again in dev (registers the key with the relay and remakes the token and known_hosts; idempotent)"
-run = 'bash "$SGW" dev sudo /usr/local/bin/sekimore-agent-setup.sh'
-
-[tasks."dev:signing-key"]
-description = "print the AI's signing public key (register it on GitHub under Settings -> SSH and GPG keys as a Signing Key)"
-run = 'bash "$SGW" dev cat /home/vscode/.ssh/sekimore/signing_ed25519.pub'
-
-# ---- The acceptance check ----
-[tasks."relay:verify"]
-description = "the relay's acceptance check: the gateway's state, that the operator's agent does not reach dev, and git through the relay from dev"
-run = '''
-set -u
-fail=0
-echo "== gateway: sekimore-relay check"
-bash "$SGW" gw sekimore-relay check | sed -n '/^state:/,$p'
-echo
-echo "== dev: the operator's ssh-agent must NOT be reachable"
-if bash "$SGW" dev ssh-add -l >/dev/null 2>&1; then
-  echo "❌ FAIL: ssh-add -l succeeded inside dev — the operator's keys are exposed to the AI. Reopen with: mise run vscode"
-  fail=1
-else
-  echo "OK: no ssh-agent in dev"
-fi
-echo
-echo "== dev: relay token (sekimore whoami)"
-bash "$SGW" dev sekimore whoami || fail=1
-echo
-echo "== dev: git ls-remote through the relay (first repo of the project)"
-bash "$SGW" dev sh -c '. /etc/sekimore-agent/env && git ls-remote "git@$SEKIMORE_GIT_DOMAIN:$SEKIMORE_REPO.git" HEAD' || fail=1
-echo "== dev: a repository outside the project must be denied"
-if bash "$SGW" dev sh -c '. /etc/sekimore-agent/env && git ls-remote "git@$SEKIMORE_GIT_DOMAIN:sekimore-test/not-in-project.git" HEAD' 2>&1 | grep -q "not in project"; then
-  echo "OK: denied"
-else
-  echo "❌ FAIL: no 'not in project' denial"; fail=1
-fi
-echo
-[ "$fail" -eq 0 ] && echo "relay:verify: all checks passed" || { echo "relay:verify: FAILED"; exit 1; }
-'''
+# The gateway's tasks call sgw.sh through this name; the other tasks find their scripts beside it.
+SGW = "{{config_root}}/.devcontainer/sgw/sgw.sh"
+# The language of the task descriptions and of what the scripts print is the first of LC_ALL,
+# LC_MESSAGES and LANG that says ja or en. Set it here to fix it, then take the task files again
+# with `mise run upgrade:sync`:
+# SEKIMORE_LANG = "ja"

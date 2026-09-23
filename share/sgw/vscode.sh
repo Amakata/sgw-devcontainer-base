@@ -19,6 +19,9 @@
 #   vscode.sh --check              report only (launchd / shell / rc files / Docker Desktop / a running VS Code)
 #   vscode.sh --restore-agent-env  put SSH_AUTH_SOCK back into launchd (before restarting Docker Desktop)
 #   SEKIMORE_VSCODE_APP=/path/to/Visual Studio Code.app   name the app location (when it cannot be found automatically)
+#
+# Distributed by sgw-devcontainer-base: `mise run upgrade:apply` replaces this file, and stops
+# rather than overwrite it once it has been edited.
 set -euo pipefail
 
 ROOT=${MISE_PROJECT_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}
@@ -27,6 +30,64 @@ STATE_DIR=${SEKIMORE_HOST_STATE_DIR:-$HOME/.sekimore}
 SAVED_SOCK_FILE=$STATE_DIR/launchd_ssh_auth_sock
 os=$(uname -s)
 
+# The relay's rule, so the gateway and these scripts agree: the first of these that names a
+# language we have decides; C, POSIX, empty and languages we do not have fall through.
+sgw_lang() {
+  local v p
+  for v in "${SEKIMORE_LANG:-}" "${LC_ALL:-}" "${LC_MESSAGES:-}" "${LANG:-}"; do
+    p=$(printf '%s' "$v" | sed 's/^[[:space:]]*//; s/[^A-Za-z].*//' | tr 'A-Z' 'a-z')
+    case $p in en|ja) echo "$p"; return ;; esac
+  done
+  echo en
+}
+L=$(sgw_lang)
+
+# msg <key>: the format string for the current language. English is the fallback.
+msg() {
+  case "$L:$1" in
+    ja:n_launchd) echo '(unset なら以後 GUI 経由で起動するアプリには渡らない)' ;;
+    *:n_launchd) echo '(unset: apps started through the GUI from now on do not get it)' ;;
+    ja:n_rc) echo '(あれば VS Code の shell env resolution で戻る → VSCODE_CLI=1 で起動する必要)' ;;
+    *:n_rc) echo "(if any, VS Code's shell env resolution brings it back → launch with VSCODE_CLI=1)" ;;
+    ja:n_dd_down) echo '(gateway の agent はこれが転送する。SSH_AUTH_SOCK ありで先に起動する)' ;;
+    *:n_dd_down) echo '(this is what forwards the agent to the gateway; start it first, with SSH_AUTH_SOCK)' ;;
+    ja:n_dd_ok) echo '(OK: gateway に agent が渡る)' ;;
+    *:n_dd_ok) echo '(OK: the agent reaches the gateway)' ;;
+    ja:n_dd_bad) echo 'gateway の agent は動かない (--restore-agent-env の後に Docker Desktop を再起動)' ;;
+    *:n_dd_bad) echo "the gateway's agent will not work (restart Docker Desktop after --restore-agent-env)" ;;
+    ja:n_exposed) echo 'このままだとあなたの SSH 鍵がコンテナ内の AI から使えてしまう' ;;
+    *:n_exposed) echo 'as it stands, your SSH key is usable by the AI inside the container' ;;
+    ja:restored) echo 'vscode.sh: launchd の SSH_AUTH_SOCK を %s に戻しました (Docker Desktop を再起動するならこの後)' ;;
+    *:restored) echo 'vscode.sh: launchd SSH_AUTH_SOCK restored to %s (restart Docker Desktop after this, if you are going to)' ;;
+    ja:must_quit) echo '  起動中の VS Code が SSH_AUTH_SOCK を持っています。完全終了 (Cmd+Q) が必要です。' ;;
+    *:must_quit) echo '  The running VS Code has SSH_AUTH_SOCK. It has to be quit completely (Cmd+Q).' ;;
+    ja:quit_now) echo '  今終了しますか? (未保存があれば VS Code が確認します) [y/N] ' ;;
+    *:quit_now) echo '  Quit it now? (VS Code will ask about anything unsaved) [y/N] ' ;;
+    ja:unset_launchd) echo 'vscode.sh: launchd の SSH_AUTH_SOCK を外しました (保存: %s。戻すには: mise run vscode:restore-agent-env)' ;;
+    *:unset_launchd) echo "vscode.sh: unset launchd's SSH_AUTH_SOCK (saved in %s; to put it back: mise run vscode:restore-agent-env)" ;;
+    ja:w_dd_down) echo 'vscode.sh: ⚠️  Docker Desktop が起動していません。gateway に agent を渡すには、vscode:restore-agent-env の後に Docker Desktop を起動してください' ;;
+    *:w_dd_down) echo 'vscode.sh: ⚠️  Docker Desktop is not running. To get the agent to the gateway, start Docker Desktop after vscode:restore-agent-env' ;;
+    ja:w_dd_bad) echo 'vscode.sh: ⚠️  Docker Desktop が SSH_AUTH_SOCK 無しで動いています。gateway の agent は使えません (vscode:restore-agent-env → Docker Desktop 再起動)' ;;
+    *:w_dd_bad) echo "vscode.sh: ⚠️  Docker Desktop is running without SSH_AUTH_SOCK. The gateway's agent will not work (vscode:restore-agent-env → restart Docker Desktop)" ;;
+    ja:e_launched) echo 'vscode.sh: ❌ 直接起動した本体 (pid %s) の環境に SSH_AUTH_SOCK があります。この出力を添えて報告してください' ;;
+    *:e_launched) echo 'vscode.sh: ❌ the directly launched app (pid %s) has SSH_AUTH_SOCK in its environment. Report this with the output above' ;;
+    ja:ok_launched) echo 'vscode.sh: 本体 pid %s の環境に SSH_AUTH_SOCK は無い' ;;
+    *:ok_launched) echo 'vscode.sh: no SSH_AUTH_SOCK in the environment of app pid %s' ;;
+    ja:e_running) echo 'vscode.sh: ❌ 起動中の VS Code の環境に SSH_AUTH_SOCK があります。この出力を添えて報告してください (mise run vscode:check でも再確認できます)' ;;
+    *:e_running) echo 'vscode.sh: ❌ the running VS Code has SSH_AUTH_SOCK in its environment. Report this with the output above (mise run vscode:check re-checks it)' ;;
+    ja:store_unlocked) echo 'vscode.sh: 秘密ストアは解錠済み' ;;
+    *:store_unlocked) echo 'vscode.sh: the secret store is unlocked' ;;
+    ja:store_unlock_now) echo 'vscode.sh: 秘密ストアが「%s」です。ここで解錠します (中断しても後から mise run gw:unlock)' ;;
+    *:store_unlock_now) echo 'vscode.sh: the secret store is "%s". Unlocking it here (if you stop, run mise run gw:unlock later)' ;;
+    ja:store_left_locked) echo 'vscode.sh: 解錠していません。後で mise run gw:unlock を実行してください' ;;
+    *:store_left_locked) echo 'vscode.sh: not unlocked. Run mise run gw:unlock later' ;;
+    ja:gw_not_up) echo 'vscode.sh: ゲートウェイはまだ起動していません。コンテナで開いた後、mise run gw:unlock で秘密ストアを解錠してください' ;;
+    *:gw_not_up) echo 'vscode.sh: the gateway is not up yet. After opening the container, unlock the secret store with mise run gw:unlock' ;;
+    ja:done) echo "vscode.sh: OK — 'Dev Containers: Reopen in Container' で開き、dev 内で 'ssh-add -l' が失敗することを確認 (mise run relay:verify)。" ;;
+    *:done) echo "vscode.sh: OK — open it with 'Dev Containers: Reopen in Container', then check that 'ssh-add -l' fails inside dev (mise run relay:verify)." ;;
+  esac
+}
+say() { local f; f=$(msg "$1"); shift; printf "$f\n" "$@"; }
 # ---- macOS: where the VS Code app is, and the name of its executable ----
 APP=""; EXE=""; APP_HOW=""
 resolve_app() {
@@ -86,17 +147,17 @@ report() {  # returns 0 = VS Code is running and has SSH_AUTH_SOCK
   local pids found=0 dirty=0 ls dp rc
   if [ "$os" = Darwin ]; then
     ls=$(launchd_sock)
-    echo "launchd SSH_AUTH_SOCK: ${ls:-<unset>}   (unset: apps started through the GUI from now on do not get it)"
+    echo "launchd SSH_AUTH_SOCK: ${ls:-<unset>}   $(msg n_launchd)"
     echo "shell   SSH_AUTH_SOCK: ${SSH_AUTH_SOCK:-<unset>}"
     rc=$(grep -ln 'SSH_AUTH_SOCK' "$HOME/.zshenv" "$HOME/.zprofile" "$HOME/.zshrc" "$HOME/.bash_profile" "$HOME/.bashrc" "$HOME/.profile" 2>/dev/null | tr '\n' ' ' || true)
-    echo "rc files setting it:   ${rc:-<none>}   (if any, VS Code's shell env resolution brings it back → launch with VSCODE_CLI=1)"
+    echo "rc files setting it:   ${rc:-<none>}   $(msg n_rc)"
     dp=$(docker_backend_pid)
     if [ -z "$dp" ]; then
-      echo "Docker Desktop:        not running (this is what forwards the agent to the gateway; start it first, with SSH_AUTH_SOCK)"
+      echo "Docker Desktop:        not running $(msg n_dd_down)"
     elif has_agent_env "$dp"; then
-      echo "Docker Desktop:        running with SSH_AUTH_SOCK (OK: the agent reaches the gateway)"
+      echo "Docker Desktop:        running with SSH_AUTH_SOCK $(msg n_dd_ok)"
     else
-      echo "Docker Desktop:        running WITHOUT SSH_AUTH_SOCK — the gateway's agent will not work (restart Docker Desktop after --restore-agent-env)"
+      echo "Docker Desktop:        running WITHOUT SSH_AUTH_SOCK — $(msg n_dd_bad)"
     fi
     if [ -n "$APP" ]; then echo "VS Code app:           $APP (exe: $EXE; via $APP_HOW)"; else echo "VS Code app:           NOT FOUND (set SEKIMORE_VSCODE_APP)"; fi
   fi
@@ -105,7 +166,7 @@ report() {  # returns 0 = VS Code is running and has SSH_AUTH_SOCK
   if [ "$found" -eq 0 ]; then echo "VS Code:               not running"; return 1; fi
   vscode_procs | cut -c1-160 | sed 's/^/  process: /'
   if [ "$dirty" -eq 1 ]; then
-    echo "VS Code:               RUNNING WITH SSH_AUTH_SOCK — as it stands, your SSH key is usable by the AI inside the container"; return 0
+    echo "VS Code:               RUNNING WITH SSH_AUTH_SOCK — $(msg n_exposed)"; return 0
   fi
   echo "VS Code:               running without SSH_AUTH_SOCK (OK)"; return 1
 }
@@ -120,7 +181,7 @@ restore_agent_env() {
   fi
   [ -n "$v" ] || { echo "vscode.sh: no saved value and no launchd agent socket found; logging out/in restores it" >&2; exit 1; }
   launchctl setenv SSH_AUTH_SOCK "$v"
-  echo "vscode.sh: launchd SSH_AUTH_SOCK restored to $v (restart Docker Desktop after this, if you are going to)"
+  say restored "$v"
 }
 
 resolve_app
@@ -128,7 +189,8 @@ case "$MODE" in
   --check) if report; then exit 1; else exit 0; fi ;;
   --restore-agent-env) restore_agent_env; exit 0 ;;
   launch) ;;
-  *) sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 2 ;;
+  # the usage is the leading comment block; a fixed line range drops lines as the block grows
+  *) sed -n '2,${/^#/!q;s/^# \{0,1\}//;p;}' "$0" >&2; exit 2 ;;
 esac
 
 if [ "${TERM_PROGRAM:-}" = "vscode" ]; then
@@ -140,9 +202,9 @@ fi
 
 # Have an already running VS Code quit (a new code only hands over to the existing instance)
 if report; then
-  echo "  The running VS Code has SSH_AUTH_SOCK. It has to be quit completely (Cmd+Q)." >&2
+  say must_quit >&2
   if [ -t 0 ] && [ "$os" = Darwin ]; then
-    printf '  Quit it now? (VS Code will ask about anything unsaved) [y/N] '
+    printf '%s' "$(msg quit_now)"
     read -r ans
     if [ "$ans" = y ] || [ "$ans" = Y ]; then
       osascript -e 'tell application "Visual Studio Code" to quit' || true
@@ -163,13 +225,13 @@ if [ "$os" = Darwin ]; then
   if [ -n "$cur" ]; then
     mkdir -p "$STATE_DIR"; printf '%s\n' "$cur" > "$SAVED_SOCK_FILE"
     launchctl unsetenv SSH_AUTH_SOCK
-    echo "vscode.sh: unset launchd's SSH_AUTH_SOCK (saved in $SAVED_SOCK_FILE; to put it back: mise run vscode:restore-agent-env)"
+    say unset_launchd "$SAVED_SOCK_FILE"
   fi
   dp=$(docker_backend_pid)
   if [ -z "$dp" ]; then
-    echo "vscode.sh: ⚠️  Docker Desktop is not running. To get the agent to the gateway, start Docker Desktop after vscode:restore-agent-env" >&2
+    say w_dd_down >&2
   elif ! has_agent_env "$dp"; then
-    echo "vscode.sh: ⚠️  Docker Desktop is running without SSH_AUTH_SOCK. The gateway's agent will not work (vscode:restore-agent-env → restart Docker Desktop)" >&2
+    say w_dd_bad >&2
   fi
 
   # (b) start the app directly instead of through open (it inherits the shell's environment = no SSH_AUTH_SOCK; VSCODE_CLI=1 leaves shell env resolution out)
@@ -190,12 +252,28 @@ for _ in $(seq 1 30); do [ -n "$(find_vscode_pids)" ] && break; sleep 1; done
 sleep 3
 if [ -n "$launched_pid" ] && kill -0 "$launched_pid" 2>/dev/null; then
   if has_agent_env "$launched_pid"; then
-    echo "vscode.sh: ❌ the directly launched app (pid $launched_pid) has SSH_AUTH_SOCK in its environment. Report this with the output above" >&2; exit 1
+    say e_launched "$launched_pid" >&2; exit 1
   fi
-  echo "vscode.sh: no SSH_AUTH_SOCK in the environment of app pid $launched_pid"
+  say ok_launched "$launched_pid"
 fi
 if report; then
-  echo "vscode.sh: ❌ the running VS Code has SSH_AUTH_SOCK in its environment. Report this with the output above (mise run vscode:check re-checks it)" >&2
+  say e_running >&2
   exit 1
 fi
-echo "vscode.sh: OK — open it with 'Dev Containers: Reopen in Container', then check that 'ssh-add -l' fails inside dev (mise run relay:verify)."
+# (d) the secret store. Locked, the relay cannot take the upstream credentials out of it.
+#     When the gateway is already up, finish the unlock while the operator is at this terminal.
+#     When it is not, that comes after "Reopen in Container", so only say what to do then.
+SGW=${SGW:-$(dirname "$0")/sgw.sh}
+if store_state=$(bash "$SGW" gw sekimore-relay store-status 2>/dev/null); then
+  case "$store_state" in
+    unlocked) say store_unlocked ;;
+    *)
+      say store_unlock_now "$store_state"
+      bash "$SGW" gw-tty sekimore-relay unlock || say store_left_locked >&2
+      ;;
+  esac
+else
+  say gw_not_up
+fi
+
+say done

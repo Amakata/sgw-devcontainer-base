@@ -39,6 +39,22 @@ jobs:
       - name: scripts/sekimore renews an expired project token
         run: tests/test_wrapper_refresh.sh
 
+  distributed:
+    name: The distributed files and mise run upgrade
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      # share/sgw/ is what upgrade hands out, and the sample starts from a copy of it. They must
+      # agree, and so must the English and Japanese task files.
+      - name: share/sgw/ and the sample agree
+        run: tests/test_sample_sgw.sh
+      # upgrade.sh against a fake GHCR, raw.githubusercontent.com and gateway.
+      - name: upgrade.sh
+        run: tests/test_upgrade.sh
+
   # アーキごとに「その CPU のネイティブランナー」でビルドする (arm64 を QEMU で回さない)。
   # push / tag では digest だけ push し、merge ジョブで manifest list にまとめてタグ付けする。PR ではビルドのみ。
   # sekimore-gw の docker-publish.yml と同じ形 (そこで踏んだ点: image 名の小文字化、digest は artifact で受け渡し、

@@ -1,0 +1,147 @@
+# The host-side tasks, included from mise.toml. `mise tasks` lists them.
+# Host-side only: the Docker inside the devcontainer has no gateway, so they refuse to run in there.
+#
+# Distributed by sgw-devcontainer-base: `mise run upgrade:apply` replaces this file, and stops
+# rather than overwrite it once it has been edited. To change a task, define one with the same
+# name in mise.toml — mise prefers it over this file.
+#
+# The order is the part worth remembering:
+#
+#   mise run vscode          # open VS Code without SSH_AUTH_SOCK (the operator's keys stay away from the AI)
+#   mise run gw:unlock       # unlock the secret store. **This comes first**; locked, the GitHub API does not work
+#   mise run gw:login        # first time only. It cannot run before the unlock
+#   mise run relay:verify    # the acceptance check for the whole set
+#   mise run upgrade         # is anything newer? (changes nothing)
+
+# ---- Starting up ----
+[vscode]
+description = "VS Code を SSH_AUTH_SOCK が届かない状態で起動する (launchd の変数を外し、open を通さず直接起動、起動後に本体の環境を確認)"
+# raw: when the gateway is already up it offers to unlock the secret store, which needs a terminal
+raw = true
+run = 'bash "$(dirname "$SGW")/vscode.sh"'
+
+["vscode:check"]
+description = "launchd / Docker Desktop / 起動中の VS Code の SSH_AUTH_SOCK の状態を表示する"
+run = 'bash "$(dirname "$SGW")/vscode.sh" --check'
+
+["vscode:restore-agent-env"]
+description = "launchd に SSH_AUTH_SOCK を戻す (mise run vscode が外したもの。Docker Desktop を再起動する前に実行)"
+run = 'bash "$(dirname "$SGW")/vscode.sh" --restore-agent-env'
+
+[web]
+description = "sekimore-gw の Web UI をブラウザで開く"
+# The port comes from the running container. A number written here drifts from the compose file
+# as soon as a project moves the published port (8090 taken, so 8091).
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+port=$(bash "$SGW" port sekimore-gw 8080)
+url="http://localhost:$port"
+echo "$url"
+open "$url" 2>/dev/null || xdg-open "$url"
+'''
+
+[ps]
+description = "この devcontainer の compose スタックのコンテナ一覧"
+run = 'bash "$SGW" ps'
+
+[down]
+description = "compose スタックを停止・削除する (volume は残る。VS Code を閉じた後の後片付け)"
+run = 'docker compose -p "$(bash "$SGW" project)" down'
+
+# ---- Upgrading ----
+[upgrade]
+description = "固定している gateway と base を最新と比べ、更新で何が変わるかを表示する (何も変更しない)"
+run = 'bash "$(dirname "$SGW")/upgrade.sh"'
+
+["upgrade:apply"]
+description = "最新に更新する: タグを書き換え、.devcontainer/sgw/ を入れ替え、確認のうえ gateway を作り直して解錠する"
+# raw: it asks before recreating the gateway, and the unlock may prompt for the passphrase
+raw = true
+run = 'bash "$(dirname "$SGW")/upgrade.sh" --apply'
+
+["upgrade:sync"]
+description = ".devcontainer/sgw/ を、いま固定している版に揃える (タグを手で変えたとき、言語を変えたとき)"
+run = 'bash "$(dirname "$SGW")/upgrade.sh" --sync'
+
+["upgrade:notes"]
+description = "固定している版から最新までの UPGRADING の節を表示する"
+run = 'bash "$(dirname "$SGW")/upgrade.sh" --notes'
+
+# ---- dev (the AI's sandbox) ----
+["dev:shell"]
+description = "dev コンテナのシェル (vscode ユーザー)"
+run = 'bash "$SGW" dev zsh'
+
+["dev:agent-setup"]
+description = "dev で agent-setup を再実行 (relay への鍵登録・トークン・known_hosts を作り直す。冪等)"
+run = 'bash "$SGW" dev sudo /usr/local/bin/sekimore-agent-setup.sh'
+
+["dev:signing-key"]
+description = "AI の署名用公開鍵を表示 (GitHub の Settings → SSH and GPG keys に Signing Key として登録する)"
+run = 'bash "$SGW" dev cat /home/vscode/.ssh/sekimore/signing_ed25519.pub'
+
+# ---- The acceptance check ----
+["relay:verify"]
+description = "relay の受け入れ確認: gateway の状態 / dev に依頼者の agent が届いていないこと / dev から関所経由の git"
+run = '''
+set -u
+fail=0
+echo "== gateway: sekimore-relay check"
+bash "$SGW" gw sekimore-relay check | sed -n '/^state:/,$p'
+echo
+echo "== dev: only the gateway's filtered signing key may be reachable"
+n=$(bash "$SGW" dev sh -c 'set -a; . /etc/sekimore-agent/env 2>/dev/null; set +a; ssh-add -l 2>/dev/null' | grep -c . || true)
+if [ "$n" = 1 ]; then
+  echo "OK: exactly one key (the signing key, via the gateway's filtered agent)"
+elif [ "$n" = 0 ]; then
+  echo "OK: no ssh-agent in dev"
+else
+  echo "❌ FAIL: ssh-add -l lists $n keys inside dev — the operator's keys are exposed to the AI. Reopen with: mise run vscode"
+  fail=1
+fi
+echo
+echo "== .env: the setup script's variables must survive sudo"
+# sudo resets the environment, so a variable missing from --preserve-env= in devcontainer.json is
+# set and then silently ignored. What the gateway and post-create.sh read does not go through sudo.
+plist=,$(sed -n 's/.*--preserve-env=\([A-Za-z0-9_,]*\).*/\1/p' .devcontainer/devcontainer.json | head -1),
+others=",SEKIMORE_AGENT_SOCK,SEKIMORE_ALLOW_AGENT_FORWARD,SEKIMORE_ALLOW_CREDENTIAL_HELPER,SEKIMORE_SECRET_ENV,"
+dropped=
+for v in $(sed -n 's/^ *\(SEKIMORE_[A-Z_]*\)=.*/\1/p' .devcontainer/.env 2>/dev/null); do
+  case "$others" in *",$v,"*) continue ;; esac
+  case "$plist" in *",$v,"*) ;; *) dropped="$dropped $v" ;; esac
+done
+if [ -n "$dropped" ]; then
+  echo "❌ FAIL:$dropped is set in .env but missing from --preserve-env= in devcontainer.json postStartCommand"
+  fail=1
+else
+  echo "OK: every setup-script variable in .env survives sudo"
+fi
+echo
+echo "== gateway: the secret store"
+# 0.2.19: the upstream API token lives in the store, so a locked one is not a note —
+# the relay cannot reach the GitHub API at all until someone unlocks it.
+state=$(bash "$SGW" gw sekimore-relay store-status 2>/dev/null || echo unavailable)
+case "$state" in
+  unlocked) echo "OK: unlocked" ;;
+  "not initialised") echo "note: no store yet. mise run gw:unlock sets the passphrase" ;;
+  *)
+    echo "❌ FAIL: the store is $state, so the relay cannot read the upstream API token. Run: mise run gw:unlock"
+    fail=1
+    ;;
+esac
+echo
+echo "== dev: relay token (sekimore whoami)"
+bash "$SGW" dev sekimore whoami || fail=1
+echo
+echo "== dev: git ls-remote through the relay (first repo of the project)"
+bash "$SGW" dev sh -c '. /etc/sekimore-agent/env && git ls-remote "git@$SEKIMORE_GIT_DOMAIN:$SEKIMORE_REPO.git" HEAD' || fail=1
+echo "== dev: a repository outside the project must be denied"
+if bash "$SGW" dev sh -c '. /etc/sekimore-agent/env && git ls-remote "git@$SEKIMORE_GIT_DOMAIN:sekimore-test/not-in-project.git" HEAD' 2>&1 | grep -q "not in project"; then
+  echo "OK: denied"
+else
+  echo "❌ FAIL: no 'not in project' denial"; fail=1
+fi
+echo
+[ "$fail" -eq 0 ] && echo "relay:verify: all checks passed" || { echo "relay:verify: FAILED"; exit 1; }
+'''
