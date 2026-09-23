@@ -15,7 +15,7 @@ env:
 jobs:
   docs:
     name: UPGRADING is current
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
@@ -28,7 +28,7 @@ jobs:
 
   wrapper:
     name: The sekimore wrapper refreshes its token
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
@@ -41,7 +41,7 @@ jobs:
 
   distributed:
     name: The distributed files and mise run upgrade
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
@@ -68,7 +68,7 @@ jobs:
       matrix:
         include:
           - platform: linux/amd64
-            runner: ubuntu-latest
+            runner: ubuntu-24.04
             arch: amd64
           - platform: linux/arm64
             runner: ubuntu-24.04-arm
@@ -141,7 +141,7 @@ jobs:
   merge:
     if: github.event_name != 'pull_request'
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       packages: write
