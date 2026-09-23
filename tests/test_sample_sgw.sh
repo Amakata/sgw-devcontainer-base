@@ -73,6 +73,18 @@ if ! cmp -s "$TMP/en" "$TMP/ja"; then diff -u "$TMP/en" "$TMP/ja" >&2 || true; f
 [ "$(grep -c '^description = ' "$SRC/tasks.mise.en.toml")" = "$(grep -c '^description = ' "$SRC/tasks.mise.ja.toml")" ] ||
   fail "a task is described in one language only"
 
+echo "== a task that opens an interactive shell has raw = true"
+# mise's prefix output mode makes stdout a pipe; sgw.sh then drops -t and the shell shows no
+# prompt. raw hands the task the terminal. Every task whose run starts a shell, or goes through
+# gw-tty, needs it.
+missing=$(awk '
+  /^\[/ { if (task != "" && interactive && !raw) print task; task = $0; raw = 0; interactive = 0; next }
+  /^raw = true/ { raw = 1 }
+  /^run = / && (/"\$SGW" (dev|gw) (zsh|bash|sh)'"'"'/ || /gw-tty/) { interactive = 1 }
+  END { if (task != "" && interactive && !raw) print task }
+' "$SRC/tasks.mise.en.toml")
+[ -z "$missing" ] || fail "interactive without raw = true: $missing"
+
 echo "== every script a task calls is distributed"
 for s in $(grep -o '\$(dirname "\$SGW")/[a-z-]*\.sh' "$SRC/tasks.mise.en.toml" | sed 's|.*/||' | sort -u); do
   [ -f "$SRC/$s" ] || fail "a task calls $s, which share/sgw/ does not have"
