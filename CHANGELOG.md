@@ -17,6 +17,12 @@ Starts at 0.2.18. Releases before it are not written up here; the pull requests
 and the tag on each are the record. The gateway each of them took is at the
 bottom.
 
+## 0.2.21 (2026-09-23)
+
+### Enhancement
+
+- takes gateway 0.2.30, and the sample runs gateway 0.2.30 with its task file (#47)
+
 ## 0.2.20 (2026-09-23)
 
 ### Enhancement

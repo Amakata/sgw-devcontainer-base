@@ -38,7 +38,7 @@ Platforms: `linux/amd64`, `linux/arm64`
   the `sekimore-relay` CLI (`/usr/local/bin/sekimore-relay`) and the `sekimore` wrapper.
   All of them are taken with `COPY --from` out of the **same `sekimore-gw` image**, so
   they cannot drift apart. Which gateway that is, is decided by `ARG SEKIMORE_GW_IMAGE`
-  in the Dockerfile — currently `ghcr.io/amakata/sekimore-gw:0.2.29` — and by nothing
+  in the Dockerfile — currently `ghcr.io/amakata/sekimore-gw:0.2.30` — and by nothing
   else; a local build overrides it with `--build-arg SEKIMORE_GW_IMAGE=...`.
   When the gateway runs the relay (the git / GitHub API relay), agent-setup arranges the
   disposable key, the project token, `known_hosts` and the signing key on its own (see
@@ -73,7 +73,7 @@ The smallest possible use is:
 
 ```dockerfile
 # a version, not latest: `mise run upgrade` reads it and moves it
-FROM ghcr.io/amakata/sgw-devcontainer-base:0.2.20
+FROM ghcr.io/amakata/sgw-devcontainer-base:0.2.21
 
 # only what this project adds
 # e.g. mise use -g python@3.13.0 && mise reshim
@@ -223,14 +223,14 @@ GitHub Actions (`.github/workflows/build-and-push.yml`) pushes these tags to GHC
 
 The gateway this image ships **for the dev container** — the `sekimore` CLI and
 `agent-setup.sh` — is whatever `ARG SEKIMORE_GW_IMAGE` in the Dockerfile names, currently
-`ghcr.io/amakata/sekimore-gw:0.2.29`. That ARG is the only thing that decides it, and a
+`ghcr.io/amakata/sekimore-gw:0.2.30`. That ARG is the only thing that decides it, and a
 local build overrides it with `--build-arg SEKIMORE_GW_IMAGE=...`. Which version each
 release took is recorded release by release in [CHANGELOG.md](CHANGELOG.md).
 
 The gateway a project **runs** is a different thing: it is the `image:` tag in your
 `.devcontainer/docker-compose.yml`, and it moves on its own. Raise it and run
 `mise run gw:recreate`; there is no need to wait for this image. The two are in step at the
-moment: this image takes 0.2.29 and the gateway is at 0.2.29. What each gateway version
+moment: this image takes 0.2.30 and the gateway is at 0.2.30. What each gateway version
 asks of you is in [UPGRADING.md](UPGRADING.md); most ask nothing.
 
 The order of a release: tag sekimore-gw → publish to GHCR → raise the `SEKIMORE_GW_IMAGE`
