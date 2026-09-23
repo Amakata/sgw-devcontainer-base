@@ -4,7 +4,8 @@
 *[English](UPGRADING.md)*
 
 **ここに載っているのは、あなたが持っているファイルを触る必要がある版だけです。**
-載っていない版は、イメージのタグを上げて `mise run gw:recreate` するだけで済みます。
+載っていない版は、`mise run upgrade:apply` だけで済みます (base 0.2.20 より前は、イメージの
+タグを上げて `mise run gw:recreate`)。
 何が変わったかは changelog にあります —
 [gateway](https://github.com/Amakata/sekimore-gw/blob/main/CHANGELOG.ja.md) /
 [relay](https://github.com/Amakata/sekimore-gw/blob/main/relay/CHANGELOG.ja.md) /
@@ -15,9 +16,9 @@
 | ファイル | 誰のものか |
 |---|---|
 | `.devcontainer/config/config.yml` | あなた。関所の設定はここ |
-| `mise.toml` | あなた。ホスト側の操作 |
-| `.devcontainer/scripts/sgw.sh` | あなた。コンテナを見つけて exec する土台 |
-| `.devcontainer/docker-compose.yml` | あなた。gateway の image タグはここ |
+| `mise.toml` | あなた。ホスト側のタスクを include し、自分のタスクを置く |
+| `.devcontainer/docker-compose.yml` | あなた。gateway の image タグはここ (`upgrade:apply` が書き換えるのはタグだけ) |
+| `.devcontainer/sgw/` | base 0.2.20 から**あなたのものではない**。`upgrade:apply` が入れ替える。それより前は `.devcontainer/scripts/sgw.sh` があなたのものだった |
 
 ## いまの版から読む場所
 
@@ -32,6 +33,10 @@
 | 0.2.22 〜 0.2.26 | [0.2.27](#0227-タグは署名が必須になった) — **エージェントにタグを push させている場合だけ** |
 | 0.2.27 | [0.2.28](#0228-dependabot-アラートは任意) — **エージェントに Dependabot アラートを読ませたい場合だけ** |
 | 0.2.28 | [0.2.29](#0229-解錠を自動化できるようになった) — **解錠を自動化したい場合か、AI のコミットを Verified のままにしたい場合だけ** |
+
+gateway とは別に、base 0.2.20 より前のプロジェクトは一度だけ手で `.devcontainer/sgw/` に移します —
+[base 0.2.20](#base-0220-devcontainersgw-と-mise-run-upgrade)。以後は、ここの節をまたぐたびに
+`mise run upgrade` が一覧に出します。
 
 ---
 
@@ -392,6 +397,9 @@ relay:
 
 ## base 0.2.19 `mise run web` が自分でポートを引く
 
+**base 0.2.20 に上げるなら飛ばしてください** — [その節](#base-0220-devcontainersgw-と-mise-run-upgrade)で
+両方のファイルがまるごと入れ替わります。
+
 **任意。** 飛ばしても壊れません。壊れるのは Web UI の公開ポートをずらしたときで、
 古い `web` task はそこで違う場所を開きます。
 
@@ -413,3 +421,55 @@ diff -u <base>/examples/sgw-sample/mise.toml mise.toml
 
 以後 `mise run web` は開く URL を表示します。ポートが違っていれば黙って外れるのでは
 なく、目に見えます。
+
+## base 0.2.20 `.devcontainer/sgw/` と `mise run upgrade`
+
+**一度だけ手で移します。以後の更新は `mise run upgrade:apply` です。**
+
+ホスト側のスクリプトとタスクは `.devcontainer/sgw/` に移り、あなたのものではなくなります。
+`mise run upgrade:apply` がまるごと入れ替え、中のファイルが手で書き換えられていれば、
+上書きせずに止まります。`mise.toml` には include と自分のタスクだけが残ります。
+
+1. `FROM` が `latest` なら、base を版で固定します。`upgrade` は 2 つのタグを読むので、
+   `latest` は上げられません:
+
+   ```dockerfile
+   FROM ghcr.io/amakata/sgw-devcontainer-base:0.2.20
+   ```
+
+2. `upgrade.sh` を置き、残りを埋めさせます:
+
+   ```bash
+   mkdir -p .devcontainer/sgw
+   curl -fsSL -o .devcontainer/sgw/upgrade.sh \
+     https://raw.githubusercontent.com/Amakata/sgw-devcontainer-base/v0.2.20/share/sgw/upgrade.sh
+   bash .devcontainer/sgw/upgrade.sh --sync
+   ```
+
+   `mise.toml` に何を書くか、どの古いファイルが使われなくなったかを表示します。
+
+3. `mise.toml` をあなただけのものにします。**配布されるようになったタスクは消してください** —
+   `vscode`、`vscode:check`、`vscode:restore-agent-env`、`web`、`ps`、`down`、`dev:*`、
+   `relay:verify`、`gw:sync-tasks`。`mise.toml` に残したタスクは同じ名前の配布タスクより
+   優先されるので、古い複製が残っていると、そのタスクへの以後の修正がすべて隠れます。
+   自分のタスクは残します:
+
+   ```toml
+   [task_config]
+   includes = [".devcontainer/sgw/tasks.mise.toml", ".devcontainer/sgw/gateway.mise.toml"]
+
+   [env]
+   SGW = "{{config_root}}/.devcontainer/sgw/sgw.sh"
+   ```
+
+4. 古い配置を消します:
+
+   ```bash
+   git rm .devcontainer/scripts/sgw.sh .devcontainer/scripts/vscode.sh .devcontainer/gateway.mise.toml
+   ```
+
+5. `mise run upgrade` が版を並べ、すべて最新と表示すれば完了です。
+
+`gw:sync-tasks` は無くなりました。`mise run upgrade:sync` が gateway のタスクも含めて取り直します。
+タスクの説明とスクリプトの表示は `LC_ALL` / `LC_MESSAGES` / `LANG` に従います。固定するなら
+`[env]` に `SEKIMORE_LANG = "ja"` (または `"en"`) を書き、`mise run upgrade:sync` を実行します。

@@ -70,7 +70,8 @@ sample の `mise.toml` にホスト側の操作 (`mise run vscode` / `gw:login` 
 最小構成は次の通り:
 
 ```dockerfile
-FROM ghcr.io/amakata/sgw-devcontainer-base:latest
+# latest ではなく版を書く。`mise run upgrade` がこれを読んで上げる
+FROM ghcr.io/amakata/sgw-devcontainer-base:0.2.20
 
 # プロジェクト固有の追加だけを書く
 # 例: mise use -g python@3.13.0 && mise reshim
@@ -113,54 +114,50 @@ gateway が読むキーは全部そこにある。設定してあるものはそ
 | `mise run dev:signing-key` | 出た公開鍵を GitHub に Signing Key として登録する |
 | `mise run relay:verify` | 一式の確認。ここが緑になって完了 |
 
-`mise.toml` と `.devcontainer/` は**複製した時点であなたのもの**で、こちらが更新しても
-自動では追従しない。下の「更新のしかた」を参照。
+複製したものは**その時点であなたのものですが、`.devcontainer/sgw/` だけは違います**。
+ホスト側のスクリプトとタスクが入っていて、`mise run upgrade:apply` が入れ替えます。
+自分のタスクは `mise.toml` に書いてください。配布タスクと同じ名前にすると、そちらが優先されます。
 
 ## 更新のしかた
 
-**版ごとに何をすべきかは [UPGRADING.ja.md](UPGRADING.ja.md) にまとめてある**
-(あなたが持っているファイルを触る必要がある版だけ。ほとんどの版は何も要らない)。
-ここに書くのは、その 3 つの版をどの順で上げるか。**独立していないので順に上げる。**
+```bash
+mise run upgrade          # 何が新しいか、どのファイルが変わるか、UPGRADING が何を求めるか。何も変更しない
+mise run upgrade:apply    # 更新する
+```
+
+`upgrade:apply` は `.devcontainer/docker-compose.yml` の gateway の `image:` タグと
+`.devcontainer/Dockerfile` の base の `FROM` タグを GHCR の最新に上げ、`.devcontainer/sgw/`
+をその版のファイルに入れ替え、確認のうえ gateway を作り直して解錠します (パスフレーズを
+ホストに保存していれば `gw:unlock-auto`)。最後に、人にしかできないことだけを表示します:
+
+- base が変わったら VS Code の **Rebuild Container**
+- 間にある [UPGRADING.ja.md](UPGRADING.ja.md) の節。あなたのファイル (`config.yml` など) を
+  触る必要がある版だけが載っています。本文は `mise run upgrade:notes` で表示できます
+- `git diff` を見てコミット
+
+`.devcontainer/sgw/` のファイルを手で書き換えていると、何も書かずに差分を出して止まります。
+変更を `mise.toml` に移し、ファイルを戻してから、もう一度実行してください。
+
+表示とタスクの説明の言語は、`LC_ALL` / `LC_MESSAGES` / `LANG` のうち最初に `ja` か `en` を
+示すもので決まります (`SEKIMORE_LANG` が最優先)。変えたら `mise run upgrade:sync` で
+タスクファイルを取り直します。
+
+3 つの版は独立していません。コマンド 1 つで揃えて動かすのはそのためです:
 
 ```
 sekimore-gw (gateway)  ── このイメージが relay バイナリを取り込む
         ↓
 sgw-devcontainer-base  ── あなたの .devcontainer/Dockerfile が FROM する
         ↓
-あなたのプロジェクトの複製 (mise.toml / .devcontainer/)
+.devcontainer/sgw/     ── 両方に合わせたホスト側のスクリプトとタスク
 ```
 
-### 1. gateway を上げる
+何が変わったかは [sekimore-gw の CHANGELOG](https://github.com/Amakata/sekimore-gw/blob/main/CHANGELOG.ja.md)、
+[relay の CHANGELOG](https://github.com/Amakata/sekimore-gw/blob/main/relay/CHANGELOG.ja.md)、
+[このリポジトリの CHANGELOG](CHANGELOG.ja.md) にあります。
 
-`.devcontainer/docker-compose.yml` の `image:` タグを上げて:
-
-```bash
-mise run gw:recreate     # pull して作り直す。docker restart では入れ替わらない
-mise run gw:unlock       # 鍵はメモリにしか無いので、作り直したら必ず
-```
-
-何が変わるかは [sekimore-gw の CHANGELOG](https://github.com/Amakata/sekimore-gw/blob/main/CHANGELOG.ja.md)
-と [relay の CHANGELOG](https://github.com/Amakata/sekimore-gw/blob/main/relay/CHANGELOG.ja.md) にある。
-
-### 2. base イメージを上げる
-
-`.devcontainer/Dockerfile` の `FROM` のタグを上げて、VS Code の **Rebuild Container**。
-
-### 3. 複製したファイルを追従させる
-
-**これが抜けやすい。** `mise.toml` と `.devcontainer/scripts/sgw.sh` はあなたの複製なので、
-雛形が変わっても届かない。実際、公開されていた雛形は `gw:unlock` を 4 版ぶん欠いたままで、
-0.2.19 の gateway では GitHub API が使えない状態だった。
-
-gateway を上げたら、雛形との差分を見る:
-
-```bash
-diff -u /path/to/sgw-devcontainer-base/examples/sgw-sample/mise.toml  mise.toml
-diff -u /path/to/sgw-devcontainer-base/examples/sgw-sample/.devcontainer/scripts/sgw.sh \
-        .devcontainer/scripts/sgw.sh
-```
-
-自分で足したタスクは残し、`gw:*` の追加分だけ取り込む。
+`.devcontainer/sgw/` より前のプロジェクトは、一度だけ手で移します:
+[UPGRADING.ja.md](UPGRADING.ja.md#base-0220-devcontainersgw-と-mise-run-upgrade)。
 
 ### 0.0.8 以前の gateway から上げる場合
 
@@ -225,7 +222,9 @@ GitHub Actions (`.github/workflows/build-and-push.yml`) が次のタグで GHCR 
 [UPGRADING.ja.md](UPGRADING.ja.md) にある。ほとんどは何も要求しない。
 
 更新順序: sekimore-gw をタグ → GHCR 公開 → このリポジトリの `SEKIMORE_GW_IMAGE` 既定を上げて push →
-GHCR 公開 → `examples/sgw-sample` の compose の image tag を追従。base はバイナリを gateway イメージから取るため、
+GHCR 公開 → `examples/sgw-sample` の compose の image tag を追従。base のリリースでは、サンプルの
+`.devcontainer/Dockerfile` の `FROM` タグも新しい版に上げ、`scripts/sync-sample-sgw.sh` で `.devcontainer/sgw/` を
+合わせる (合うまで `tests/test_sample_sgw.sh` が落ちる)。base はバイナリを gateway イメージから取るため、
 順序を飛ばせない。ビルドには `ghcr.io` と `pkg-containers.githubusercontent.com` への到達が必要。
 
 ## Local build

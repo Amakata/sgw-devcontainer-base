@@ -72,7 +72,8 @@ collects the host-side operations (`mise run vscode` / `gw:login` / `relay:verif
 The smallest possible use is:
 
 ```dockerfile
-FROM ghcr.io/amakata/sgw-devcontainer-base:latest
+# a version, not latest: `mise run upgrade` reads it and moves it
+FROM ghcr.io/amakata/sgw-devcontainer-base:0.2.20
 
 # only what this project adds
 # e.g. mise use -g python@3.13.0 && mise reshim
@@ -116,56 +117,52 @@ that matter:
 | `mise run dev:signing-key` | Register the public key it prints with GitHub, as a Signing Key |
 | `mise run relay:verify` | Checks the whole set-up. Green here means done |
 
-`mise.toml` and `.devcontainer/` **are yours from the moment you copy them**, and an
-update here does not reach them. See "Keeping up to date" below.
+Everything you copy **is yours from that moment, except `.devcontainer/sgw/`** — the host
+scripts and tasks, which `mise run upgrade:apply` replaces. Put your own tasks in
+`mise.toml`; a task there with the same name as a distributed one wins.
 
 ## Keeping up to date
 
-**What each release asks of you is in [UPGRADING.md](UPGRADING.md)** — only the releases
-that make you edit a file you own, which most are not. What is here is the order the three
-versions go up in. **They are not independent, so raise them in order.**
+```bash
+mise run upgrade          # what is newer, which files it would change, what UPGRADING asks. Changes nothing
+mise run upgrade:apply    # move to it
+```
+
+`upgrade:apply` raises the gateway's `image:` tag in `.devcontainer/docker-compose.yml` and
+the base's `FROM` tag in `.devcontainer/Dockerfile` to the newest on GHCR, replaces
+`.devcontainer/sgw/` with the files of those versions, recreates the gateway after asking,
+and unlocks it (`gw:unlock-auto`, when the passphrase is kept on the host). It ends with
+what only you can do:
+
+- **Rebuild Container** in VS Code, when the base moved
+- the sections of [UPGRADING.md](UPGRADING.md) in between — only releases that ask you to
+  edit a file you own (`config.yml`, say) are there, and `mise run upgrade:notes` prints them
+- `git diff`, and commit
+
+A file in `.devcontainer/sgw/` that was edited by hand stops it, with the diff, before
+anything is written. Move the change into `mise.toml`, restore the file, and run it again.
+
+The language of what it prints, and of the task descriptions, is the first of `LC_ALL`,
+`LC_MESSAGES` and `LANG` that says `ja` or `en` (`SEKIMORE_LANG` before all of them). After
+changing it, `mise run upgrade:sync` takes the task files again.
+
+The three versions are not independent, which is why one command moves them:
 
 ```
 sekimore-gw (the gateway)  ── this image copies the relay binaries out of it
         ↓
 sgw-devcontainer-base      ── your .devcontainer/Dockerfile FROMs it
         ↓
-your copy (mise.toml / .devcontainer/)
-```
-
-### 1. Raise the gateway
-
-Raise the `image:` tag in `.devcontainer/docker-compose.yml`, then:
-
-```bash
-mise run gw:recreate     # pull and recreate. `docker restart` does not swap the image
-mise run gw:unlock       # the key only ever lives in memory, so always, after a recreate
+.devcontainer/sgw/         ── the host scripts and tasks for both
 ```
 
 What changed is in the
-[gateway's CHANGELOG](https://github.com/Amakata/sekimore-gw/blob/main/CHANGELOG.md) and
-the [relay's CHANGELOG](https://github.com/Amakata/sekimore-gw/blob/main/relay/CHANGELOG.md).
+[gateway's CHANGELOG](https://github.com/Amakata/sekimore-gw/blob/main/CHANGELOG.md), the
+[relay's CHANGELOG](https://github.com/Amakata/sekimore-gw/blob/main/relay/CHANGELOG.md) and
+[this one](CHANGELOG.md).
 
-### 2. Raise the base image
-
-Raise the tag on `FROM` in `.devcontainer/Dockerfile`, then **Rebuild Container** in VS Code.
-
-### 3. Bring your copies along
-
-**This is the one that gets missed.** `mise.toml` and `.devcontainer/scripts/sgw.sh` are
-your copies, so a change to the template does not reach them. It happened: the published
-template went four releases without `gw:unlock`, which left the GitHub API unusable on a
-0.2.19 gateway.
-
-After raising the gateway, look at the difference against the template:
-
-```bash
-diff -u /path/to/sgw-devcontainer-base/examples/sgw-sample/mise.toml  mise.toml
-diff -u /path/to/sgw-devcontainer-base/examples/sgw-sample/.devcontainer/scripts/sgw.sh \
-        .devcontainer/scripts/sgw.sh
-```
-
-Keep the tasks you added; take only what was added under `gw:*`.
+A project from before `.devcontainer/sgw/` moves to it once, by hand:
+[UPGRADING.md](UPGRADING.md#base-0220-devcontainersgw-and-mise-run-upgrade).
 
 <!-- UPGRADING.md and UPGRADING.ja.md link here by the heading this section used to have -->
 <a name="008-以前の-gateway-から上げる場合" id="008-以前の-gateway-から上げる場合"></a>
@@ -238,7 +235,9 @@ asks of you is in [UPGRADING.md](UPGRADING.md); most ask nothing.
 
 The order of a release: tag sekimore-gw → publish to GHCR → raise the `SEKIMORE_GW_IMAGE`
 default in this repository and push → publish to GHCR → follow with the image tag in
-`examples/sgw-sample`'s compose. The base takes its binaries out of the gateway image, so
+`examples/sgw-sample`'s compose. When the base is released, the sample's `.devcontainer/Dockerfile`
+moves to the new `FROM` tag, and `scripts/sync-sample-sgw.sh` rewrites its `.devcontainer/sgw/`
+to match (`tests/test_sample_sgw.sh` fails until they agree). The base takes its binaries out of the gateway image, so
 no step can be skipped. The build needs to reach `ghcr.io` and
 `pkg-containers.githubusercontent.com`.
 

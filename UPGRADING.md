@@ -4,8 +4,8 @@
 *[日本語版](UPGRADING.ja.md)*
 
 **Only the releases that need you to change a file you own are listed here.**
-For anything not listed, raising the image tag and running `mise run gw:recreate`
-is the whole upgrade. What changed is in the changelogs —
+For anything not listed, `mise run upgrade:apply` is the whole upgrade (before base 0.2.20:
+raising the image tag and running `mise run gw:recreate`). What changed is in the changelogs —
 [gateway](https://github.com/Amakata/sekimore-gw/blob/main/CHANGELOG.md) /
 [relay](https://github.com/Amakata/sekimore-gw/blob/main/relay/CHANGELOG.md) /
 [base](CHANGELOG.md).
@@ -15,9 +15,9 @@ is the whole upgrade. What changed is in the changelogs —
 | file | whose |
 |---|---|
 | `.devcontainer/config/config.yml` | yours. The relay's configuration lives here |
-| `mise.toml` | yours. The host-side operations |
-| `.devcontainer/scripts/sgw.sh` | yours. What finds the container and execs into it |
-| `.devcontainer/docker-compose.yml` | yours. The gateway's image tag is here |
+| `mise.toml` | yours. It includes the host-side tasks, and holds your own |
+| `.devcontainer/docker-compose.yml` | yours. The gateway's image tag is here (`upgrade:apply` rewrites the tag, and nothing else) |
+| `.devcontainer/sgw/` | **not yours** from base 0.2.20: `upgrade:apply` replaces it. Before that, `.devcontainer/scripts/sgw.sh` was yours |
 
 ## Where to start reading
 
@@ -32,6 +32,10 @@ is the whole upgrade. What changed is in the changelogs —
 | 0.2.22 – 0.2.26 | [0.2.27](#0227-tags-have-to-be-signed) — **only if the agent pushes tags** |
 | 0.2.27 | [0.2.28](#0228-dependabot-alerts-are-optional) — **only if you want the agent to read Dependabot alerts** |
 | 0.2.28 | [0.2.29](#0229-unattended-unlock-is-available) — **only if you want unattended unlock, or AI commits that stay Verified** |
+
+Separately from the gateway: a project from before base 0.2.20 moves to `.devcontainer/sgw/` once,
+by hand — [base 0.2.20](#base-0220-devcontainersgw-and-mise-run-upgrade). After that, every
+section here is listed by `mise run upgrade` when it is crossed.
 
 ---
 
@@ -414,6 +418,9 @@ delta looks the same from inside the pack otherwise. So the gateway has to be un
 
 ## base 0.2.19 `mise run web` finds the port itself
 
+**Moving to base 0.2.20? Skip this** — [its section](#base-0220-devcontainersgw-and-mise-run-upgrade)
+replaces both files whole.
+
 **Optional.** Nothing breaks if you skip it — until you move the Web UI's
 published port, which is when the old `web` task goes to the wrong place.
 
@@ -435,3 +442,55 @@ diff -u <base>/examples/sgw-sample/mise.toml mise.toml
 
 Then `mise run web` prints the URL it opens, so a wrong port is visible rather
 than silent.
+
+## base 0.2.20 `.devcontainer/sgw/` and `mise run upgrade`
+
+**Once, by hand; after this, upgrading is `mise run upgrade:apply`.**
+
+The host scripts and tasks move into `.devcontainer/sgw/`, which is no longer yours:
+`mise run upgrade:apply` replaces it whole, and stops rather than overwrite a file in it
+that was edited by hand. `mise.toml` keeps only the includes and your own tasks.
+
+1. Pin the base to a version, if `FROM` says `latest`. `upgrade` reads the two tags and
+   cannot move a `latest`:
+
+   ```dockerfile
+   FROM ghcr.io/amakata/sgw-devcontainer-base:0.2.20
+   ```
+
+2. Put `upgrade.sh` in place and let it fill the rest:
+
+   ```bash
+   mkdir -p .devcontainer/sgw
+   curl -fsSL -o .devcontainer/sgw/upgrade.sh \
+     https://raw.githubusercontent.com/Amakata/sgw-devcontainer-base/v0.2.20/share/sgw/upgrade.sh
+   bash .devcontainer/sgw/upgrade.sh --sync
+   ```
+
+   It prints what `mise.toml` has to include, and which old files are no longer used.
+
+3. Make `mise.toml` yours alone. **Delete the tasks that are now distributed** — `vscode`,
+   `vscode:check`, `vscode:restore-agent-env`, `web`, `ps`, `down`, `dev:*`,
+   `relay:verify` and `gw:sync-tasks`. A task left in `mise.toml` wins over the distributed
+   one of the same name, so a stale copy would hide every later fix to it. Keep your own:
+
+   ```toml
+   [task_config]
+   includes = [".devcontainer/sgw/tasks.mise.toml", ".devcontainer/sgw/gateway.mise.toml"]
+
+   [env]
+   SGW = "{{config_root}}/.devcontainer/sgw/sgw.sh"
+   ```
+
+4. Remove the old layout:
+
+   ```bash
+   git rm .devcontainer/scripts/sgw.sh .devcontainer/scripts/vscode.sh .devcontainer/gateway.mise.toml
+   ```
+
+5. `mise run upgrade` should now list the versions and say everything is up to date.
+
+`gw:sync-tasks` is gone: `mise run upgrade:sync` takes the gateway's tasks and the rest
+together. The task descriptions, and what the scripts print, follow `LC_ALL` /
+`LC_MESSAGES` / `LANG`; set `SEKIMORE_LANG = "ja"` (or `"en"`) under `[env]` to fix it, then
+`mise run upgrade:sync`.
