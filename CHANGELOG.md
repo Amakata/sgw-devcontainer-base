@@ -17,6 +17,14 @@ Starts at 0.2.18. Releases before it are not written up here; the pull requests
 and the tag on each are the record. The gateway each of them took is at the
 bottom.
 
+## 0.2.20 (unreleased)
+
+### Enhancement
+
+- `mise run upgrade` compares the pinned gateway and base with the newest on GHCR and says what would change; `upgrade:apply` rewrites the two tags, replaces `.devcontainer/sgw/`, recreates the gateway after asking and unlocks it, then lists only what a person has to do. A hand-edited distributed file stops it with the diff before anything is written. `upgrade:sync` replaces `gw:sync-tasks`, and `upgrade:notes` prints the UPGRADING sections in between (#45)
+- the host scripts and tasks move into `.devcontainer/sgw/`, which `upgrade` owns; `mise.toml` keeps only the includes and the project's own tasks, and a task there wins over the distributed one of the same name. The sample moves to the layout and pins `FROM` to a version (#45)
+- what `upgrade.sh`, `sgw.sh` and `vscode.sh` print, and the task descriptions, follow the relay's language rule: `SEKIMORE_LANG`, `LC_ALL`, `LC_MESSAGES`, `LANG` (#45)
+
 ## 0.2.19 (2026-09-22)
 
 ### Fix

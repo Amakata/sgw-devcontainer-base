@@ -14,6 +14,14 @@ DevContainer のベースイメージ — Dockerfile と焼き込む道具、同
 0.2.18 から始める。それ以前のリリースはここに書かない。各 PR とタグが記録。
 取り込んだ gateway の版だけは末尾にある。
 
+## 0.2.20（未リリース）
+
+### Enhancement
+
+- `mise run upgrade` が、固定している gateway と base を GHCR の最新と比べ、何が変わるかを表示する。`upgrade:apply` は 2 つのタグを書き換え、`.devcontainer/sgw/` を入れ替え、確認のうえ gateway を作り直して解錠し、人がやることだけを最後に並べる。配布物が手で書き換えられていれば、何も書かずに差分を出して止まる。`upgrade:sync` が `gw:sync-tasks` を置き換え、`upgrade:notes` は間にある UPGRADING の節を表示する (#45)
+- ホスト側のスクリプトとタスクを `.devcontainer/sgw/` に移した。ここは `upgrade` のもので、`mise.toml` には include と自分のタスクだけが残る。`mise.toml` のタスクは同じ名前の配布タスクより優先される。サンプルもこの配置にし、`FROM` を版で固定した (#45)
+- `upgrade.sh` / `sgw.sh` / `vscode.sh` の表示とタスクの説明が、relay と同じ規則で言語を決める: `SEKIMORE_LANG`、`LC_ALL`、`LC_MESSAGES`、`LANG` (#45)
+
 ## 0.2.19（2026-09-22）
 
 ### Fix
