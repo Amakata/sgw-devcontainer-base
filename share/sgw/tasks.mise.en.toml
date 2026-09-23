@@ -104,6 +104,31 @@ else
   fail=1
 fi
 echo
+echo "== dev: git signs with the key it is meant to"
+# The Dev Containers extension copies the host's user.signingkey over the container's on every
+# start; from gateway 0.2.31 agent-setup's own setting wins. An inline key:: value, or a key the
+# signing socket does not offer, makes every commit fail with "Couldn't find key in agent".
+sig=$(bash "$SGW" dev sh -c 'set -a; . /etc/sekimore-agent/env 2>/dev/null; set +a
+  [ "$(git config --get commit.gpgsign 2>/dev/null)" = true ] || { echo off; exit; }
+  k=$(git config --get user.signingkey 2>/dev/null)
+  case $k in "") echo "unset"; exit ;; key::*) echo inline; exit ;; esac
+  [ -f "$k" ] || { echo "missing: $k"; exit; }
+  if [ -n "${SEKIMORE_SIGNING_SOCK:-}" ]; then
+    pub=$(cut -d" " -f1,2 "$k")
+    if SSH_AUTH_SOCK=$SEKIMORE_SIGNING_SOCK ssh-add -L 2>/dev/null | cut -d" " -f1,2 | grep -qxF "$pub"; then echo ok; else echo "not offered by the signing socket: $k"; fi
+  else
+    echo ok
+  fi' 2>/dev/null || echo "dev unavailable")
+case "$sig" in
+  ok) echo "OK: user.signingkey is the key the gateway signs with" ;;
+  off) echo "note: commit signing is off in dev" ;;
+  inline)
+    echo "❌ FAIL: user.signingkey is an inline key:: value — the host's, copied in by the Dev Containers extension. Recreate with gateway 0.2.31 or later"
+    fail=1
+    ;;
+  *) echo "❌ FAIL: user.signingkey — $sig"; fail=1 ;;
+esac
+echo
 echo "== .env: the setup script's variables must survive sudo"
 # sudo resets the environment. post-start.sh passes every SEKIMORE_* variable through it; the older
 # postStartCommand named them in --preserve-env=, and one missing from that list is set and then
