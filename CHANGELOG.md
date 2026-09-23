@@ -17,6 +17,12 @@ Starts at 0.2.18. Releases before it are not written up here; the pull requests
 and the tag on each are the record. The gateway each of them took is at the
 bottom.
 
+## 0.2.22 (2026-09-23)
+
+### Fix
+
+- `postStartCommand` runs the distributed `.devcontainer/sgw/post-start.sh`, which passes every `SEKIMORE_*` variable through `sudo` to agent-setup; a variable missing from a hand-kept `--preserve-env=` list was silently ignored, and the sample had none. `mise run upgrade` points at the one-line change, and a plain check now shows what the project's own files need (#49)
+
 ## 0.2.21 (2026-09-23)
 
 ### Enhancement

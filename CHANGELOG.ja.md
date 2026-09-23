@@ -14,6 +14,12 @@ DevContainer のベースイメージ — Dockerfile と焼き込む道具、同
 0.2.18 から始める。それ以前のリリースはここに書かない。各 PR とタグが記録。
 取り込んだ gateway の版だけは末尾にある。
 
+## 0.2.22（2026-09-23）
+
+### Fix
+
+- `postStartCommand` が配布物の `.devcontainer/sgw/post-start.sh` を実行する。コンテナにある `SEKIMORE_*` 変数をすべて `sudo` 越しに agent-setup に渡す。手で持っていた `--preserve-env=` の一覧から漏れた変数は黙って無視され、サンプルには一覧自体が無かった。`mise run upgrade` が 1 行の書き換えを案内し、調べるだけのときもあなたのファイルに要る変更を表示する (#49)
+
 ## 0.2.21（2026-09-23）
 
 ### Enhancement

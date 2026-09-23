@@ -71,7 +71,7 @@ sample の `mise.toml` にホスト側の操作 (`mise run vscode` / `gw:login` 
 
 ```dockerfile
 # latest ではなく版を書く。`mise run upgrade` がこれを読んで上げる
-FROM ghcr.io/amakata/sgw-devcontainer-base:0.2.21
+FROM ghcr.io/amakata/sgw-devcontainer-base:0.2.22
 
 # プロジェクト固有の追加だけを書く
 # 例: mise use -g python@3.13.0 && mise reshim
