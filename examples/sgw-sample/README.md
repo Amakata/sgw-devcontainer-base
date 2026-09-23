@@ -84,6 +84,7 @@ sgw-sample/
     │   ├── sgw.sh                  # finds the gateway / dev container by compose label and docker execs into it
     │   ├── vscode.sh               # mise run vscode
     │   ├── upgrade.sh              # mise run upgrade
+    │   ├── post-start.sh           # what postStartCommand runs: agent-setup (with every SEKIMORE_* variable), docker-init, post-create
     │   └── MANIFEST                # what upgrade wrote last, to tell an edit apart
     └── zsh-config/
         └── rc.d/                   # the project's own zsh configuration

@@ -54,6 +54,9 @@ jobs:
       # upgrade.sh against a fake GHCR, raw.githubusercontent.com and gateway.
       - name: upgrade.sh
         run: tests/test_upgrade.sh
+      # post-start.sh against a fake sudo that lets through only what --preserve-env names.
+      - name: post-start.sh
+        run: tests/test_post_start.sh
 
   # アーキごとに「その CPU のネイティブランナー」でビルドする (arm64 を QEMU で回さない)。
   # push / tag では digest だけ push し、merge ジョブで manifest list にまとめてタグ付けする。PR ではビルドのみ。

@@ -1,0 +1,75 @@
+#!/bin/sh
+# share/sgw/post-start.sh passes every SEKIMORE_* variable to agent-setup through sudo, and runs
+# the three steps in order (sgw-devcontainer-base#48).
+#
+# A fake `sudo` on PATH records its arguments and runs the command, so what reaches agent-setup is
+# what the real sudo would let through with --preserve-env. What must not pass:
+#   - a name that only starts like one (SEKIMOREX) or merely contains it (FOO_SEKIMORE_X)
+#   - post-create after agent-setup failed
+#
+# Run it directly: tests/test_post_start.sh
+set -eu
+
+unset CDPATH
+ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd)
+SCRIPT=$ROOT/share/sgw/post-start.sh
+TMP=$(mktemp -d)
+trap 'rm -rf "$TMP"' EXIT INT TERM
+fail() { echo "FAIL: $*" >&2; exit 1; }
+
+mkdir -p "$TMP/bin"
+# sudo: record the arguments, then run the command with only the preserved variables (plus PATH),
+# the way env_reset + --preserve-env behaves
+cat > "$TMP/bin/sudo" <<'S'
+#!/bin/sh
+echo "$*" >> "$LOG/sudo"
+keep=
+case $1 in --preserve-env=*) keep=${1#--preserve-env=}; shift ;; esac
+# unset everything that is not preserved, then run: what env_reset + --preserve-env leaves
+for v in $(env | sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p'); do
+  case ",$keep,PATH,LOG," in *",$v,"*) ;; *) unset "$v" 2>/dev/null || true ;; esac
+done
+exec "$@"
+S
+cat > "$TMP/agent-setup" <<'S'
+#!/bin/sh
+env | grep '^SEKIMORE' | sort > "$LOG/seen"
+echo agent-setup >> "$LOG/order"
+[ "${SEKIMORE_FAIL:-}" != 1 ]
+S
+printf '#!/bin/sh\necho docker-init >> "$LOG/order"\n' > "$TMP/docker-init"
+printf 'echo post-create >> "$LOG/order"\n' > "$TMP/post-create.sh"
+chmod +x "$TMP/bin/sudo" "$TMP/agent-setup" "$TMP/docker-init"
+
+run() {
+  rm -rf "$TMP/log"; mkdir -p "$TMP/log"
+  RC=0
+  env -i PATH="$TMP/bin:$PATH" LOG="$TMP/log" SGW_AGENT_SETUP="$TMP/agent-setup" \
+    SGW_DOCKER_INIT="$TMP/docker-init" SGW_POST_CREATE="${POST_CREATE-$TMP/post-create.sh}" \
+    "$@" sh "$SCRIPT" >/dev/null 2>&1 || RC=$?
+}
+
+echo "== every SEKIMORE_* variable reaches agent-setup, and nothing that only looks like one"
+run SEKIMORE_PROJECT=p SEKIMORE_GUIDE_LANG=ja SEKIMORE_SIGNING_KEY_COMMENT="a b c" SEKIMOREX=1 FOO_SEKIMORE_X=2
+[ "$RC" = 0 ] || fail "exited $RC"
+grep -q '^--preserve-env=SEKIMORE_GUIDE_LANG,SEKIMORE_PROJECT,SEKIMORE_SIGNING_KEY_COMMENT ' "$TMP/log/sudo" || { cat "$TMP/log/sudo"; fail "the preserve list is not the three SEKIMORE_ names"; }
+grep -qx 'SEKIMORE_GUIDE_LANG=ja' "$TMP/log/seen" || fail "SEKIMORE_GUIDE_LANG did not reach agent-setup"
+grep -qx 'SEKIMORE_SIGNING_KEY_COMMENT=a b c' "$TMP/log/seen" || fail "a value with spaces did not survive"
+if grep -q 'SEKIMOREX\|FOO_SEKIMORE' "$TMP/log/seen" "$TMP/log/sudo"; then fail "a name that only resembles SEKIMORE_* was passed"; fi
+[ "$(cat "$TMP/log/order" | tr '\n' ' ')" = "agent-setup docker-init post-create " ] || fail "steps out of order: $(cat "$TMP/log/order")"
+
+echo "== no SEKIMORE_* variable at all: sudo without --preserve-env"
+run
+[ "$RC" = 0 ] || fail "exited $RC"
+if grep -q 'preserve-env' "$TMP/log/sudo"; then fail "an empty --preserve-env was passed"; fi
+
+echo "== agent-setup fails: nothing after it runs"
+run SEKIMORE_FAIL=1
+[ "$RC" != 0 ] || fail "a failed agent-setup was not a failure"
+[ "$(cat "$TMP/log/order")" = "agent-setup" ] || fail "ran past a failed agent-setup: $(cat "$TMP/log/order")"
+
+echo "== a project without post-create.sh"
+POST_CREATE=$TMP/none.sh run SEKIMORE_PROJECT=p
+[ "$RC" = 0 ] || fail "a missing post-create.sh failed the start"
+
+echo "PASS: post-start.sh"

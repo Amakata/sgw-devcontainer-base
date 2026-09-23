@@ -86,6 +86,7 @@ case \$1 in
 esac
 EOF
   printf '# vscode.sh base %s\n' "$v" > "$d/vscode.sh"
+  printf '# post-start.sh base %s\n' "$v" > "$d/post-start.sh"
   printf '# tasks base %s en\n' "$v" > "$d/tasks.mise.en.toml"
   printf '# tasks base %s ja\n' "$v" > "$d/tasks.mise.ja.toml"
 done
@@ -325,6 +326,21 @@ up "$P" --sync
 has "$LOG/out" 'includes = [".devcontainer/sgw/tasks.mise.toml", ".devcontainer/sgw/gateway.mise.toml"]'
 has "$LOG/out" "git rm .devcontainer/scripts/sgw.sh .devcontainer/gateway.mise.toml"
 has "$P/mise.toml" "scripts/sgw.sh"
+
+echo "== a devcontainer.json that calls agent-setup itself is told to run post-start.sh; one that does is not"
+P=$TMP/p10; new_project "$P"
+printf '{ "postStartCommand": "sudo --preserve-env=SEKIMORE_PROJECT /usr/local/bin/sekimore-agent-setup.sh" }\n' > "$P/.devcontainer/devcontainer.json"
+# the check alone already says so: it is where a person looks first
+up "$P"
+has "$LOG/out" "What your own files need"
+has "$LOG/out" '"postStartCommand": "sh /workspace/.devcontainer/sgw/post-start.sh",'
+up "$P" --sync
+[ "$RC" = 0 ] || { cat "$LOG/err"; fail "sync exited $RC"; }
+has "$LOG/out" '"postStartCommand": "sh /workspace/.devcontainer/sgw/post-start.sh",'
+has "$P/.devcontainer/sgw/post-start.sh" "post-start.sh base 0.2.19"
+printf '{ "postStartCommand": "sh /workspace/.devcontainer/sgw/post-start.sh" }\n' > "$P/.devcontainer/devcontainer.json"
+up "$P" --sync
+hasnt "$LOG/out" "postStartCommand"
 
 echo "== unpinned, and inside the dev container"
 P=$TMP/p9; new_project "$P"

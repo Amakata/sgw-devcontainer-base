@@ -38,7 +38,7 @@ GW_REPO=${SGW_GATEWAY_REPO:-Amakata/sekimore-gw}
 BASE_REPO=${SGW_BASE_REPO:-Amakata/sgw-devcontainer-base}
 RAW=${SGW_RAW_URL:-https://raw.githubusercontent.com}
 
-FILES="sgw.sh vscode.sh upgrade.sh tasks.mise.toml gateway.mise.toml"
+FILES="sgw.sh vscode.sh upgrade.sh post-start.sh tasks.mise.toml gateway.mise.toml"
 
 # ---- language ----
 # The relay's rule, so the gateway and these scripts agree: the first of these that names a
@@ -82,11 +82,11 @@ msg() {
     *:up_to_date) echo 'up to date' ;;
     ja:update) echo '← 更新あり' ;;
     *:update) echo '← update available' ;;
-    ja:files_at) echo '.devcontainer/sgw/ (配布物。%s の版にしたとき)' ;;
+    ja:files_at) echo '.devcontainer/sgw/ (配布物。%sにしたとき)' ;;
     *:files_at) echo '.devcontainer/sgw/ (distributed files, at the %s versions)' ;;
-    ja:at_newest) echo '最新' ;;
+    ja:at_newest) echo '最新の版' ;;
     *:at_newest) echo 'newest' ;;
-    ja:at_pinned) echo 'いまの' ;;
+    ja:at_pinned) echo 'いまの版' ;;
     *:at_pinned) echo 'pinned' ;;
     ja:f_same) echo '変わらず' ;;
     *:f_same) echo 'same' ;;
@@ -122,6 +122,8 @@ msg() {
     *:ask_recreate) echo 'Recreate the gateway on %s now? Connections in use are dropped. [y/N] ' ;;
     ja:unlock_try) echo 'gateway の秘密ストアが「%s」です。gw:unlock-auto を試します' ;;
     *:unlock_try) echo 'the gateway'"'"'s secret store is "%s"; trying gw:unlock-auto' ;;
+    ja:owned_hdr) echo 'あなたのファイルで要る変更 (upgrade はここを書き換えません)' ;;
+    *:owned_hdr) echo 'What your own files need (upgrade does not write these)' ;;
     ja:remain) echo '残り (人がやること)' ;;
     *:remain) echo 'What is left (for you)' ;;
     ja:r_recreate) echo 'gateway を作り直す: mise run gw:recreate' ;;
@@ -138,6 +140,8 @@ msg() {
     *:r_include) echo 'mise.toml does not take .devcontainer/sgw/ in. Put this into mise.toml:' ;;
     ja:r_leftover) echo 'もう使われていないファイル: git rm %s' ;;
     *:r_leftover) echo 'no longer used: git rm %s' ;;
+    ja:r_poststart) echo 'devcontainer.json の postStartCommand を次の 1 行にしてください (sudo に渡す SEKIMORE_* の一覧を post-start.sh が持ちます。以前の --preserve-env= の一覧は要りません):' ;;
+    *:r_poststart) echo 'make devcontainer.json'"'"'s postStartCommand this one line (post-start.sh passes every SEKIMORE_* variable to sudo; the old --preserve-env= list goes):' ;;
     ja:r_commit) echo '変更を確かめてコミットする: git diff' ;;
     *:r_commit) echo 'review the change and commit it: git diff' ;;
     ja:r_none) echo 'なし' ;;
@@ -383,7 +387,45 @@ if [ "$CUR_GW" = "$NEW_GW" ] && [ "$CUR_BASE" = "$NEW_BASE" ] && [ -z "$CHANGED"
   UP_TO_DATE=1
 fi
 
+REMAIN=
+remain() { REMAIN="$REMAIN$1
+"; }
+
+# mise.toml is the user's: say what it needs, never write it
+M=$ROOT/mise.toml
+if ! grep -q '\.devcontainer/sgw/tasks\.mise\.toml' "$M" 2>/dev/null ||
+   ! grep -q '\.devcontainer/sgw/gateway\.mise\.toml' "$M" 2>/dev/null ||
+   ! grep -q '^[[:space:]]*SGW[[:space:]]*=.*\.devcontainer/sgw/sgw\.sh' "$M" 2>/dev/null; then
+  remain "$(msg r_include)
+      [task_config]
+      includes = [\".devcontainer/sgw/tasks.mise.toml\", \".devcontainer/sgw/gateway.mise.toml\"]
+
+      [env]
+      SGW = \"{{config_root}}/.devcontainer/sgw/sgw.sh\""
+fi
+# devcontainer.json is the user's too. Its postStartCommand used to name the variables agent-setup
+# needs in --preserve-env=, a list that fell behind whenever agent-setup gained one; post-start.sh
+# passes them all. Say so until the project runs it.
+DCJ=$ROOT/.devcontainer/devcontainer.json
+if [ -f "$DCJ" ] && grep -q 'sekimore-agent-setup' "$DCJ" && ! grep -q '\.devcontainer/sgw/post-start\.sh' "$DCJ"; then
+  remain "$(msg r_poststart)
+      \"postStartCommand\": \"sh /workspace/.devcontainer/sgw/post-start.sh\","
+fi
+# the layout before .devcontainer/sgw/
+LEFT=
+for old in .devcontainer/scripts/sgw.sh .devcontainer/scripts/vscode.sh .devcontainer/gateway.mise.toml; do
+  [ -e "$ROOT/$old" ] && LEFT="$LEFT $old"
+done
+[ -z "$LEFT" ] || remain "$(say r_leftover "${LEFT# }")"
+
 if [ "$MODE" = check ]; then
+  # What the project's own files need is said here too, not only after an apply: a check is where
+  # a person looks first, and these do not wait for a new version.
+  if [ -n "$REMAIN" ]; then
+    say owned_hdr
+    printf '%s' "$REMAIN" | sed 's/^\([^ ]\)/  - \1/'
+    echo
+  fi
   if [ "$UP_TO_DATE" = 1 ]; then say all_current
   elif [ -n "$EDITED" ]; then say next_edited
   else say next_apply
@@ -402,10 +444,6 @@ if [ -n "$EDITED" ]; then
   say unchanged >&2
   exit 1
 fi
-
-REMAIN=
-remain() { REMAIN="$REMAIN$1
-"; }
 
 if [ "$UP_TO_DATE" = 1 ]; then
   say all_current
@@ -439,25 +477,6 @@ else
   cp "$TMP/MANIFEST" "$SGW_DIR/.MANIFEST.new" && chmod 644 "$SGW_DIR/.MANIFEST.new" && mv "$SGW_DIR/.MANIFEST.new" "$MANIFEST"
 fi
 echo
-
-# mise.toml is the user's: say what it needs, never write it
-M=$ROOT/mise.toml
-if ! grep -q '\.devcontainer/sgw/tasks\.mise\.toml' "$M" 2>/dev/null ||
-   ! grep -q '\.devcontainer/sgw/gateway\.mise\.toml' "$M" 2>/dev/null ||
-   ! grep -q '^[[:space:]]*SGW[[:space:]]*=.*\.devcontainer/sgw/sgw\.sh' "$M" 2>/dev/null; then
-  remain "$(msg r_include)
-      [task_config]
-      includes = [\".devcontainer/sgw/tasks.mise.toml\", \".devcontainer/sgw/gateway.mise.toml\"]
-
-      [env]
-      SGW = \"{{config_root}}/.devcontainer/sgw/sgw.sh\""
-fi
-# the layout before .devcontainer/sgw/
-LEFT=
-for old in .devcontainer/scripts/sgw.sh .devcontainer/scripts/vscode.sh .devcontainer/gateway.mise.toml; do
-  [ -e "$ROOT/$old" ] && LEFT="$LEFT $old"
-done
-[ -z "$LEFT" ] || remain "$(say r_leftover "${LEFT# }")"
 
 SGW=$SGW_DIR/sgw.sh
 if [ "$MODE" = apply ] && [ "$CUR_GW" != "$NEW_GW" ]; then

@@ -473,3 +473,20 @@ diff -u <base>/examples/sgw-sample/mise.toml mise.toml
 `gw:sync-tasks` は無くなりました。`mise run upgrade:sync` が gateway のタスクも含めて取り直します。
 タスクの説明とスクリプトの表示は `LC_ALL` / `LC_MESSAGES` / `LANG` に従います。固定するなら
 `[env]` に `SEKIMORE_LANG = "ja"` (または `"en"`) を書き、`mise run upgrade:sync` を実行します。
+
+## base 0.2.22 `postStartCommand` が `.devcontainer/sgw/post-start.sh` を実行する
+
+**`devcontainer.json` を 1 行、一度だけ書き換えます。** 済むまで `mise run upgrade` が案内します。
+
+```json
+"postStartCommand": "sh /workspace/.devcontainer/sgw/post-start.sh",
+```
+
+`agent-setup` は `sudo` で動くので環境がリセットされ、`.env` の変数は `--preserve-env=` に
+書いたものしか届きませんでした。一覧から漏れた変数は、設定しても黙って無視されます。その一覧は
+あなたのファイルであるここにあり、agent-setup が変数を増やすたびに遅れていました
+(`SEKIMORE_GUIDE_LANG`)。`post-start.sh` はコンテナにある `SEKIMORE_*` 変数をすべて渡し、
+続けて `docker-init.sh` とあなたの `.devcontainer/scripts/post-create.sh` を実行します。
+以前の 1 行がしていたことと同じです。そこで他に実行していたものは `post-create.sh` に移してください。
+
+`.env` にある「`--preserve-env=` に足すこと」というコメントも不要になります。

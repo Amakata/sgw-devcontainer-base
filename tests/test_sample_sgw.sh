@@ -21,6 +21,8 @@ SRC=$ROOT/share/sgw
 SAMPLE=$ROOT/examples/sgw-sample
 DST=$SAMPLE/.devcontainer/sgw
 SCRIPTS="sgw.sh vscode.sh upgrade.sh"
+# every distributed script, including the one that runs inside dev and prints nothing of its own
+ALL_SCRIPTS="$SCRIPTS post-start.sh"
 
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT INT TERM
@@ -28,14 +30,14 @@ fail() { echo "FAIL: $*" >&2; exit 1; }
 sha() { if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | cut -d' ' -f1; else shasum -a 256 "$1" | cut -d' ' -f1; fi; }
 
 echo "== the scripts parse, and are executable"
-for f in $SCRIPTS; do
+for f in $ALL_SCRIPTS; do
   bash -n "$SRC/$f" || fail "$f does not parse"
   [ -x "$SRC/$f" ] || fail "share/sgw/$f is not executable"
   [ -x "$DST/$f" ] || fail "the sample's $f is not executable"
 done
 
 echo "== the sample's copies equal share/sgw/"
-for f in $SCRIPTS; do
+for f in $ALL_SCRIPTS; do
   cmp -s "$SRC/$f" "$DST/$f" || fail "examples/sgw-sample/.devcontainer/sgw/$f differs from share/sgw/$f (scripts/sync-sample-sgw.sh)"
 done
 cmp -s "$SRC/tasks.mise.en.toml" "$DST/tasks.mise.toml" ||
@@ -49,13 +51,19 @@ gw=$(sed -n 's|^[[:space:]]*image:[[:space:]]*ghcr.io/amakata/sekimore-gw:\([0-9
 {
   sed -n '/^new_manifest() {/,/^}/p' "$SRC/upgrade.sh" | sed -n 's/^  echo "\(# .*\)"$/\1/p'
   echo "base $base"; echo "gateway $gw"; echo "lang en"
-  for f in sgw.sh vscode.sh upgrade.sh tasks.mise.toml gateway.mise.toml; do echo "file $f $(sha "$DST/$f")"; done
+  for f in sgw.sh vscode.sh upgrade.sh post-start.sh tasks.mise.toml gateway.mise.toml; do echo "file $f $(sha "$DST/$f")"; done
 } > "$TMP/MANIFEST"
 [ "$(grep -c '^#' "$TMP/MANIFEST")" -ge 1 ] || fail "could not read MANIFEST's header out of upgrade.sh"
 if ! cmp -s "$TMP/MANIFEST" "$DST/MANIFEST"; then
   diff -u "$DST/MANIFEST" "$TMP/MANIFEST" >&2 || true
   fail "the sample's MANIFEST is stale (a copied file, or a pinned version, changed without it: scripts/sync-sample-sgw.sh)"
 fi
+
+echo "== the sample starts through post-start.sh"
+# the list of variables sudo lets through lives in post-start.sh; a postStartCommand that calls
+# agent-setup itself brings back the list that kept falling behind
+grep -q '"postStartCommand": "sh /workspace/.devcontainer/sgw/post-start.sh"' "$SAMPLE/.devcontainer/devcontainer.json" ||
+  fail "the sample's postStartCommand does not run .devcontainer/sgw/post-start.sh"
 
 echo "== tasks.mise.en.toml and .ja.toml differ only in their descriptions"
 strip() { grep -v '^description = ' "$1"; }
