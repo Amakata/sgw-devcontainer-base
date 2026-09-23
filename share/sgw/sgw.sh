@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # sgw.sh — operate this devcontainer's compose stack (started by the Dev Containers extension) from the Mac.
-# Called from the mise.toml tasks. To use it directly:
+# Called from the mise tasks. To use it directly:
 #
 #   sgw.sh gw   [cmd...]   run cmd in the sekimore-gw container (default: sekimore-relay check)
+#   sgw.sh gw-tty cmd...   the same, always with a terminal (for commands that read a passphrase)
 #   sgw.sh dev  [cmd...]   run cmd in the dev container (as the vscode user. default: zsh)
 #   sgw.sh id   <service>  print the container ID
 #   sgw.sh port <service> [container-port]  print the published host port (default: 8080)
@@ -12,16 +13,51 @@
 #
 # How it finds them: the compose labels (service name + the project's working_dir = this .devcontainer).
 # The project name depends on the folder name, so look it up by label rather than by name.
+#
+# Distributed by sgw-devcontainer-base: `mise run upgrade:apply` replaces this file, and stops
+# rather than overwrite it once it has been edited.
 set -euo pipefail
 
 ROOT=${MISE_PROJECT_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}
 COMPOSE_DIR=${SGW_COMPOSE_DIR:-$ROOT/.devcontainer}
 
+# The relay's rule, so the gateway and these scripts agree: the first of these that names a
+# language we have decides; C, POSIX, empty and languages we do not have fall through.
+sgw_lang() {
+  local v p
+  for v in "${SEKIMORE_LANG:-}" "${LC_ALL:-}" "${LC_MESSAGES:-}" "${LANG:-}"; do
+    p=$(printf '%s' "$v" | sed 's/^[[:space:]]*//; s/[^A-Za-z].*//' | tr 'A-Z' 'a-z')
+    case $p in en|ja) echo "$p"; return ;; esac
+  done
+  echo en
+}
+L=$(sgw_lang)
+
+# msg <key>: the format string for the current language. English is the fallback.
+msg() {
+  case "$L:$1" in
+    ja:inside) echo 'sgw: ここは dev コンテナの中です。スタックを動かしている Docker Desktop のホスト (Mac) で実行してください。' ;;
+    *:inside) echo "sgw: this is the inside of the dev container; run it on the host (Mac) where Docker Desktop runs the stack." ;;
+    ja:none) echo "sgw: サービス '%s' のコンテナが動いていません (devcontainer は開いていますか? working_dir=%s)" ;;
+    *:none) echo "sgw: no running container for service '%s' (is the devcontainer open? working_dir=%s)" ;;
+    ja:several) echo "sgw: '%s' のコンテナが複数動いています。他を止めるか、MISE_PROJECT_ROOT / SGW_COMPOSE_DIR を指定してください:" ;;
+    *:several) echo "sgw: several '%s' containers are running; stop the others or set MISE_PROJECT_ROOT / SGW_COMPOSE_DIR:" ;;
+    ja:needs_tty) echo 'sgw.sh: %s は標準入力に端末が要ります (パイプで渡さないでください)' ;;
+    *:needs_tty) echo 'sgw.sh: %s needs a terminal on stdin (do not pipe it)' ;;
+    ja:no_port) echo "sgw: サービス '%s' はコンテナのポート %s をホストに公開していません" ;;
+    *:no_port) echo "sgw: service '%s' publishes no host port for %s" ;;
+    ja:waiting) echo 'gateway の起動を待っています' ;;
+    *:waiting) echo 'waiting for the gateway' ;;
+    ja:recreated) echo '完了。Web UI の Relay タブを再読み込みしてください (または mise run gw:check)' ;;
+    *:recreated) echo 'done. reload the Web UI Relay tab (or run: mise run gw:check)' ;;
+  esac
+}
+say() { local f; f=$(msg "$1"); shift; printf "$f\n" "$@"; }
+
 if [ "${DEVCONTAINER:-}" = "true" ] && [ -z "${SGW_FORCE:-}" ]; then
-  echo "sgw: this is the inside of the dev container; run it on the host (Mac) where Docker Desktop runs the stack." >&2
+  say inside >&2
   exit 2
 fi
-
 by_label() { docker ps -q --filter "label=com.docker.compose.project.working_dir=$COMPOSE_DIR" "$@"; }
 
 find_container() {
@@ -34,12 +70,12 @@ find_container() {
   fi
   n=$(printf '%s\n' "$ids" | grep -c . || true)
   if [ "$n" -eq 0 ]; then
-    echo "sgw: no running container for service '$svc' (is the devcontainer open? working_dir=$COMPOSE_DIR)" >&2
+    say none "$svc" "$COMPOSE_DIR" >&2
     docker ps -a --format '  {{.Names}}  {{.Status}}  ({{.Image}})' --filter "label=com.docker.compose.service=$svc" >&2 || true
     exit 1
   fi
   if [ "$n" -gt 1 ]; then
-    echo "sgw: several '$svc' containers are running; stop the others or set MISE_PROJECT_ROOT / SGW_COMPOSE_DIR:" >&2
+    say several "$svc" >&2
     docker ps --format '  {{.Names}}  {{.Label "com.docker.compose.project.working_dir"}}' --filter "label=com.docker.compose.service=$svc" >&2
     exit 1
   fi
@@ -90,7 +126,7 @@ case "${1:-}" in
   # do not need costs nothing: docker only refuses -t when stdin itself is not one.
   gw-tty)
     shift; cid=$(find_container sekimore-gw)
-    [ -t 0 ] || { echo "sgw.sh: $* needs a terminal on stdin (do not pipe it)" >&2; exit 2; }
+    [ -t 0 ] || { say needs_tty "$*" >&2; exit 2; }
     exec docker exec -it "$cid" "$@" ;;
   dev)
     shift; cid=$(find_container dev)
@@ -106,7 +142,7 @@ case "${1:-}" in
     cport=${3:-8080}
     cid=$(find_container "$svc")
     hp=$(docker port "$cid" "$cport" 2>/dev/null | head -1)
-    [ -n "$hp" ] || { echo "sgw: service '$svc' publishes no host port for $cport" >&2; exit 1; }
+    [ -n "$hp" ] || { say no_port "$svc" "$cport" >&2; exit 1; }
     # take the number out of "0.0.0.0:8091" or "[::]:8091"
     printf '%s\n' "${hp##*:}" ;;
   recreate)
@@ -137,13 +173,13 @@ case "${1:-}" in
     docker compose -p "$proj" --project-directory "$wd" "${FARGS[@]}" up -d --force-recreate sekimore-gw
     new=$(find_container sekimore-gw)
     echo "after:   $(docker inspect -f "{{.Image}}" "$new")"
-    printf "waiting for the gateway"
+    printf "%s" "$(msg waiting)"
     for _ in $(seq 1 30); do
       # the gateway has no curl, so hit it with python (always present)
       if docker exec "$new" python -c "import urllib.request,sys; urllib.request.urlopen(\"http://127.0.0.1:8080/api/config\",timeout=3)" 2>/dev/null; then echo " ok"; break; fi
       printf "."; sleep 1
     done
-    echo "done. reload the Web UI Relay tab (or run: mise run gw:check)" ;;
+    say recreated ;;
   project)
     cid=$(find_container sekimore-gw)
     docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' "$cid" ;;

@@ -14,7 +14,9 @@
 
 ## 使い方
 
-ホスト (Mac + Docker Desktop) 側の操作は `mise.toml` の task にまとめてある (`mise tasks` で一覧)。
+ホスト (Mac + Docker Desktop) 側の操作は mise の task にまとめてある (`mise tasks` で一覧)。
+実体は `.devcontainer/sgw/` にあり、`mise run upgrade:apply` が最新に保つ。`mise.toml` はあなたのもので、
+それを include しているだけ。
 
 1. `.devcontainer/.env.sample` を `.devcontainer/.env` にコピーして値を埋める
    (`SEKIMORE_AGENT_SOCK` は依頼者の ssh-agent socket。Docker Desktop なら既定値のままでよい)
@@ -38,16 +40,17 @@
 `mise run gw -- <sekimore-relay の任意のサブコマンド>`。
 
 relay を使わない場合は `devcontainer.json` の `dockerComposeFile` から `docker-compose.relay.yml` を外し、
-`config/config.yml` の `domain_handlers:` / `relay:` を消す (`mise.toml` の gw:* / relay:* も不要になる)。
+`config/config.yml` の `domain_handlers:` / `relay:` を消す (gw:* / relay:* の task も不要になる)。
 
-新しいプロジェクトに使う場合は `.devcontainer/` と `mise.toml` をコピーする。
+新しいプロジェクトに使う場合は `.devcontainer/` と `mise.toml` をコピーする。以後は
+`mise run upgrade` で新しい版があるかを確かめ、`mise run upgrade:apply` で上げる。
 
 ## ファイル構成
 
 ```
 sgw-sample/
 ├── README.md
-├── mise.toml                       # ホスト側の操作 (vscode / gw:unlock / gw:login / gw:recreate / relay:verify …)
+├── mise.toml                       # あなたのもの: .devcontainer/sgw/ の include と、自分のタスク
 └── .devcontainer/
     ├── devcontainer.json
     ├── docker-compose.yml          # dev + sekimore-gw の 2 サービス
@@ -60,8 +63,14 @@ sgw-sample/
     │   └── squid/
     │       └── squid.conf.template
     ├── scripts/
-    │   ├── post-create.sh          # zsh rc.d の展開、agent 転送の検知 (ERROR で止める)
-    │   └── sgw.sh                  # mise task が使う: compose ラベルで gateway / dev コンテナを見つけて docker exec
+    │   └── post-create.sh          # zsh rc.d の展開、agent 転送の検知 (ERROR で止める)
+    ├── sgw/                        # 配布物: mise run upgrade:apply がまるごと入れ替える。編集しない
+    │   ├── tasks.mise.toml         # ホスト側の task (vscode / web / relay:verify / upgrade …)
+    │   ├── gateway.mise.toml       # gateway の task (gw:*)。動かしている版のもの
+    │   ├── sgw.sh                  # compose ラベルで gateway / dev コンテナを見つけて docker exec
+    │   ├── vscode.sh               # mise run vscode
+    │   ├── upgrade.sh              # mise run upgrade
+    │   └── MANIFEST                # upgrade が最後に書いた記録。手で書き換えたかの判定に使う
     └── zsh-config/
         └── rc.d/                   # プロジェクト固有 zsh 設定
 ```

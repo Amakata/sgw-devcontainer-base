@@ -16,8 +16,9 @@ The smallest devcontainer built on `sgw-devcontainer-base`.
 
 ## Using it
 
-The host-side operations (Mac + Docker Desktop) are collected as tasks in `mise.toml`
-(`mise tasks` lists them).
+The host-side operations (Mac + Docker Desktop) are mise tasks (`mise tasks` lists them). They
+live in `.devcontainer/sgw/`, which `mise run upgrade:apply` keeps current; `mise.toml` is yours,
+and only includes them.
 
 1. Copy `.devcontainer/.env.sample` to `.devcontainer/.env` and fill in the values
    (`SEKIMORE_AGENT_SOCK` is the operator's ssh-agent socket; on Docker Desktop the default is
@@ -52,17 +53,18 @@ log) / `mise run gw:revoke-project` (the project is over) /
 `mise run gw -- <any sekimore-relay subcommand>`.
 
 Without the relay, drop `docker-compose.relay.yml` from `devcontainer.json`'s
-`dockerComposeFile` and delete `domain_handlers:` / `relay:` from `config/config.yml` (gw:* and
-relay:* in `mise.toml` are then unnecessary too).
+`dockerComposeFile` and delete `domain_handlers:` / `relay:` from `config/config.yml` (the gw:* and
+relay:* tasks are then unnecessary too).
 
-To use this for a new project, copy `.devcontainer/` and `mise.toml`.
+To use this for a new project, copy `.devcontainer/` and `mise.toml`. From then on,
+`mise run upgrade` says whether anything is newer and `mise run upgrade:apply` moves to it.
 
 ## The files
 
 ```
 sgw-sample/
 ├── README.md
-├── mise.toml                       # the host-side operations (vscode / gw:unlock / gw:login / gw:recreate / relay:verify …)
+├── mise.toml                       # yours: includes .devcontainer/sgw/, and your own tasks
 └── .devcontainer/
     ├── devcontainer.json
     ├── docker-compose.yml          # two services, dev and sekimore-gw
@@ -75,8 +77,14 @@ sgw-sample/
     │   └── squid/
     │       └── squid.conf.template
     ├── scripts/
-    │   ├── post-create.sh          # unpacks zsh rc.d, detects agent forwarding (and stops with an ERROR)
-    │   └── sgw.sh                  # used by the mise tasks: finds the gateway / dev container by compose label and docker execs into it
+    │   └── post-create.sh          # unpacks zsh rc.d, detects agent forwarding (and stops with an ERROR)
+    ├── sgw/                        # distributed: mise run upgrade:apply replaces all of it. Do not edit
+    │   ├── tasks.mise.toml         # the host-side tasks (vscode / web / relay:verify / upgrade …)
+    │   ├── gateway.mise.toml       # the gateway's tasks (gw:*), for the version it runs
+    │   ├── sgw.sh                  # finds the gateway / dev container by compose label and docker execs into it
+    │   ├── vscode.sh               # mise run vscode
+    │   ├── upgrade.sh              # mise run upgrade
+    │   └── MANIFEST                # what upgrade wrote last, to tell an edit apart
     └── zsh-config/
         └── rc.d/                   # the project's own zsh configuration
 ```
