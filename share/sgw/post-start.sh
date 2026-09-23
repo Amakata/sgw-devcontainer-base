@@ -3,7 +3,8 @@
 #
 #   1. sekimore-agent-setup.sh as root, with every SEKIMORE_* variable this container has
 #   2. docker-init.sh, which starts the Docker daemon inside dev
-#   3. the project's own .devcontainer/scripts/post-create.sh, when there is one
+#   3. take out the HTTPS credential helper the Dev Containers extension plants (below)
+#   4. the project's own .devcontainer/scripts/post-create.sh, when there is one
 #
 #   "postStartCommand": "sh /workspace/.devcontainer/sgw/post-start.sh"
 #
@@ -35,6 +36,31 @@ else
   sudo "$agent_setup"
 fi
 "$docker_init"
+
+# The VS Code Dev Containers extension writes a git credential.helper into /etc/gitconfig and
+# ~/.gitconfig that hands HTTPS git the operator's GitHub credentials from the host — a way around
+# the gateway, whose git goes over SSH. It writes it again on every start, so it is taken out on
+# every start. Here rather than in rc.d: /etc/gitconfig needs sudo, and it has to hold for the AI's
+# non-interactive commands too. (The other route, GIT_ASKPASS, is 70-sekimore.zsh's.) Each project
+# used to carry this in post-create.sh, and the copies carried a bug that stopped the start (#56).
+# SEKIMORE_ALLOW_CREDENTIAL_HELPER=1 keeps the helper, for tracking a problem down.
+if [ "${SEKIMORE_ALLOW_CREDENTIAL_HELPER:-0}" != 1 ]; then
+  removed=
+  for scope in system global; do
+    as=; [ "$scope" = global ] || as=sudo
+    case $(git config --"$scope" --get-all credential.helper 2>/dev/null || true) in
+      *vscode-remote-containers*|*vscode-server*)
+        $as git config --"$scope" --unset-all credential.helper 2>/dev/null || true
+        # an empty value clears any helper set before it, in a file read earlier
+        $as git config --"$scope" credential.helper "" 2>/dev/null || true
+        removed="$removed $scope"
+        ;;
+    esac
+  done
+  if [ -n "$removed" ]; then
+    echo "[post-start] took out the VS Code HTTPS git credential helper (${removed# }); git goes over the gateway's SSH. SEKIMORE_ALLOW_CREDENTIAL_HELPER=1 keeps it"
+  fi
+fi
 if [ -f "$post_create" ]; then
   sh "$post_create"
 fi

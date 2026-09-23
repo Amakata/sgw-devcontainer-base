@@ -11,6 +11,9 @@ fi
 # operator's GitHub credentials from the host (VS Code injects GIT_ASKPASS + VSCODE_GIT_IPC_HANDLE,
 # which git uses for HTTP Basic auth — a path that bypasses the relay). git@github.com goes through
 # the relay's SSH and is unaffected. Set SEKIMORE_ALLOW_CREDENTIAL_HELPER=1 to keep the VS Code askpass.
+# The other half — the credential.helper the extension writes into /etc/gitconfig and ~/.gitconfig —
+# is taken out by .devcontainer/sgw/post-start.sh on every start (it needs sudo, and has to hold
+# outside interactive shells too).
 if [ "${SEKIMORE_ALLOW_CREDENTIAL_HELPER:-0}" != "1" ]; then
   export GIT_ASKPASS=""
   export SSH_ASKPASS=""
