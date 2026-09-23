@@ -494,3 +494,21 @@ that was edited by hand. `mise.toml` keeps only the includes and your own tasks.
 together. The task descriptions, and what the scripts print, follow `LC_ALL` /
 `LC_MESSAGES` / `LANG`; set `SEKIMORE_LANG = "ja"` (or `"en"`) under `[env]` to fix it, then
 `mise run upgrade:sync`.
+
+## base 0.2.22 `postStartCommand` runs `.devcontainer/sgw/post-start.sh`
+
+**One line in `devcontainer.json`, once.** `mise run upgrade` points at it until it is done.
+
+```json
+"postStartCommand": "sh /workspace/.devcontainer/sgw/post-start.sh",
+```
+
+`agent-setup` runs under `sudo`, which resets the environment, so a variable from `.env`
+reached it only if `--preserve-env=` named it — and one missing from the list was set and
+then silently ignored. The list lived in this file, which is yours, and fell behind each
+time agent-setup gained an input (`SEKIMORE_GUIDE_LANG`). `post-start.sh` passes every
+`SEKIMORE_*` variable the container has, then runs `docker-init.sh` and your
+`.devcontainer/scripts/post-create.sh`, which is what the old line did. Anything else you
+ran there goes in `post-create.sh`.
+
+A comment in `.env` that tells you to add a variable to `--preserve-env=` can go too.

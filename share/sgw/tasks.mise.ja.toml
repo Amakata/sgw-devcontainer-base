@@ -102,8 +102,12 @@ else
 fi
 echo
 echo "== .env: the setup script's variables must survive sudo"
-# sudo resets the environment, so a variable missing from --preserve-env= in devcontainer.json is
-# set and then silently ignored. What the gateway and post-create.sh read does not go through sudo.
+# sudo resets the environment. post-start.sh passes every SEKIMORE_* variable through it; the older
+# postStartCommand named them in --preserve-env=, and one missing from that list is set and then
+# silently ignored. What the gateway and post-create.sh read does not go through sudo.
+if grep -q '\.devcontainer/sgw/post-start\.sh' .devcontainer/devcontainer.json 2>/dev/null; then
+  echo "OK: postStartCommand runs .devcontainer/sgw/post-start.sh, which passes every SEKIMORE_* variable"
+else
 plist=,$(sed -n 's/.*--preserve-env=\([A-Za-z0-9_,]*\).*/\1/p' .devcontainer/devcontainer.json | head -1),
 others=",SEKIMORE_AGENT_SOCK,SEKIMORE_ALLOW_AGENT_FORWARD,SEKIMORE_ALLOW_CREDENTIAL_HELPER,SEKIMORE_SECRET_ENV,"
 dropped=
@@ -112,10 +116,11 @@ for v in $(sed -n 's/^ *\(SEKIMORE_[A-Z_]*\)=.*/\1/p' .devcontainer/.env 2>/dev/
   case "$plist" in *",$v,"*) ;; *) dropped="$dropped $v" ;; esac
 done
 if [ -n "$dropped" ]; then
-  echo "❌ FAIL:$dropped is set in .env but missing from --preserve-env= in devcontainer.json postStartCommand"
+  echo "❌ FAIL:$dropped is set in .env but missing from --preserve-env= in devcontainer.json postStartCommand. Run .devcontainer/sgw/post-start.sh from it instead (mise run upgrade says how)"
   fail=1
 else
   echo "OK: every setup-script variable in .env survives sudo"
+fi
 fi
 echo
 echo "== gateway: the secret store"

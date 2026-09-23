@@ -20,13 +20,13 @@ gw=$(sed -n 's|^[[:space:]]*image:[[:space:]]*ghcr.io/amakata/sekimore-gw:\([0-9
 [ -n "$base" ] && [ -n "$gw" ] || { echo "sync-sample-sgw: the sample must pin both the base (Dockerfile) and the gateway (compose)" >&2; exit 1; }
 
 mkdir -p "$DST"
-for f in sgw.sh vscode.sh upgrade.sh; do cp "$SRC/$f" "$DST/$f"; chmod 755 "$DST/$f"; done
+for f in sgw.sh vscode.sh upgrade.sh post-start.sh; do cp "$SRC/$f" "$DST/$f"; chmod 755 "$DST/$f"; done
 cp "$SRC/tasks.mise.en.toml" "$DST/tasks.mise.toml"
 [ -f "$DST/gateway.mise.toml" ] || { echo "sync-sample-sgw: $DST/gateway.mise.toml is missing (take share/gateway.mise.en.toml from sekimore-gw v$gw)" >&2; exit 1; }
 {
   # the header upgrade.sh writes, taken out of upgrade.sh so the two cannot differ
   sed -n '/^new_manifest() {/,/^}/p' "$SRC/upgrade.sh" | sed -n 's/^  echo "\(# .*\)"$/\1/p'
   echo "base $base"; echo "gateway $gw"; echo "lang en"
-  for f in sgw.sh vscode.sh upgrade.sh tasks.mise.toml gateway.mise.toml; do echo "file $f $(sha "$DST/$f")"; done
+  for f in sgw.sh vscode.sh upgrade.sh post-start.sh tasks.mise.toml gateway.mise.toml; do echo "file $f $(sha "$DST/$f")"; done
 } > "$DST/MANIFEST"
 echo "sync-sample-sgw: examples/sgw-sample/.devcontainer/sgw/ at base $base, gateway $gw"
