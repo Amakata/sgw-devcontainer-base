@@ -17,6 +17,17 @@ Starts at 0.2.18. Releases before it are not written up here; the pull requests
 and the tag on each are the record. The gateway each of them took is at the
 bottom.
 
+## 0.2.23 (2026-09-23)
+
+### Fix
+
+- `dev:shell` gets `raw = true`: in mise's prefix output mode its stdout was a pipe, so the shell started without a terminal and showed no prompt. CI now fails on any task that starts a shell or goes through `gw-tty` without `raw = true` (#51)
+- `relay:verify` checks that `user.signingkey` is the key the gateway's signing socket offers, and says so when it is not — an inline `key::` value, or a key file the socket does not offer (#51)
+
+### Enhancement
+
+- takes gateway 0.2.31 (#51)
+
 ## 0.2.22 (2026-09-23)
 
 ### Fix
