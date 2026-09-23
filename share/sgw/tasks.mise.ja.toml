@@ -71,6 +71,9 @@ run = 'bash "$(dirname "$SGW")/upgrade.sh" --notes'
 # ---- dev (the AI's sandbox) ----
 ["dev:shell"]
 description = "dev コンテナのシェル (vscode ユーザー)"
+# raw: an interactive shell needs the terminal; without it mise's prefix output mode makes stdout a
+# pipe, sgw.sh drops -t, and zsh sits there without a prompt
+raw = true
 run = 'bash "$SGW" dev zsh'
 
 ["dev:agent-setup"]
