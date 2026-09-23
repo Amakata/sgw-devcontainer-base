@@ -14,6 +14,12 @@ DevContainer のベースイメージ — Dockerfile と焼き込む道具、同
 0.2.18 から始める。それ以前のリリースはここに書かない。各 PR とタグが記録。
 取り込んだ gateway の版だけは末尾にある。
 
+## 0.2.26（2026-09-23）
+
+### Fix
+
+- `post-start.sh` が VS Code の HTTPS credential helper を起動のたびに取り除く。`/etc/gitconfig` は sudo で書き換える。各プロジェクトの `post-create.sh` にあった写しは起動を止めることがあり、サンプルの写しは system 側に届いていなかった (#57)
+
 ## 0.2.25（2026-09-23）
 
 ### Fix
