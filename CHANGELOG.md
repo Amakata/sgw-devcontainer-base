@@ -17,6 +17,12 @@ Starts at 0.2.18. Releases before it are not written up here; the pull requests
 and the tag on each are the record. The gateway each of them took is at the
 bottom.
 
+## 0.2.26 (2026-09-23)
+
+### Fix
+
+- `post-start.sh` takes out the VS Code HTTPS credential helper on every start, with sudo for `/etc/gitconfig`; the copies of this in projects' `post-create.sh` could stop the start, and the sample's never reached the system file (#57)
+
 ## 0.2.25 (2026-09-23)
 
 ### Fix

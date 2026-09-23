@@ -27,7 +27,7 @@ keep=
 case $1 in --preserve-env=*) keep=${1#--preserve-env=}; shift ;; esac
 # unset everything that is not preserved, then run: what env_reset + --preserve-env leaves
 for v in $(env | sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p'); do
-  case ",$keep,PATH,LOG," in *",$v,"*) ;; *) unset "$v" 2>/dev/null || true ;; esac
+  case ",$keep,PATH,LOG,HOME,GIT_CONFIG_SYSTEM," in *",$v,"*) ;; *) unset "$v" 2>/dev/null || true ;; esac
 done
 exec "$@"
 S
@@ -44,7 +44,7 @@ chmod +x "$TMP/bin/sudo" "$TMP/agent-setup" "$TMP/docker-init"
 run() {
   rm -rf "$TMP/log"; mkdir -p "$TMP/log"
   RC=0
-  env -i PATH="$TMP/bin:$PATH" LOG="$TMP/log" SGW_AGENT_SETUP="$TMP/agent-setup" \
+  env -i PATH="$TMP/bin:$PATH" LOG="$TMP/log" HOME="$TMP/home" GIT_CONFIG_SYSTEM="$TMP/etc-gitconfig" SGW_AGENT_SETUP="$TMP/agent-setup" \
     SGW_DOCKER_INIT="$TMP/docker-init" SGW_POST_CREATE="${POST_CREATE-$TMP/post-create.sh}" \
     "$@" sh "$SCRIPT" >/dev/null 2>&1 || RC=$?
 }
@@ -71,5 +71,33 @@ run SEKIMORE_FAIL=1
 echo "== a project without post-create.sh"
 POST_CREATE=$TMP/none.sh run SEKIMORE_PROJECT=p
 [ "$RC" = 0 ] || fail "a missing post-create.sh failed the start"
+
+echo "== the VS Code credential helper is taken out of system and global config"
+mkdir -p "$TMP/home"
+VS='!f() { /vscode/vscode-server/bin/node /tmp/vscode-remote-containers-abc.js git-credential-helper $*; }; f'
+sysgit() { GIT_CONFIG_SYSTEM="$TMP/etc-gitconfig" HOME="$TMP/home" git config "$@"; }
+reset_git() { rm -f "$TMP/etc-gitconfig" "$TMP/home/.gitconfig"; }
+reset_git; sysgit --system credential.helper "$VS"; sysgit --global credential.helper "$VS"
+run SEKIMORE_PROJECT=p
+[ "$RC" = 0 ] || fail "exited $RC"
+[ "$(sysgit --system --get-all credential.helper)" = "" ] || fail "the system helper is still there: $(sysgit --system --get-all credential.helper)"
+[ "$(sysgit --global --get-all credential.helper)" = "" ] || fail "the global helper is still there"
+grep -q post-create "$TMP/log/order" || fail "post-create did not run after the helper was taken out"
+
+echo "== nothing to take out is not a failure (the copies in post-create.sh stopped the start here)"
+reset_git
+run SEKIMORE_PROJECT=p
+[ "$RC" = 0 ] || fail "exited $RC with no helper to remove"
+[ "$(tail -1 "$TMP/log/order")" = "post-create" ] || fail "did not reach post-create"
+
+echo "== a helper that is not VS Code's is left alone"
+reset_git; sysgit --global credential.helper store
+run SEKIMORE_PROJECT=p
+[ "$(sysgit --global --get-all credential.helper)" = "store" ] || fail "a helper that is not VS Code's was changed"
+
+echo "== SEKIMORE_ALLOW_CREDENTIAL_HELPER=1 keeps it"
+reset_git; sysgit --global credential.helper "$VS"
+run SEKIMORE_ALLOW_CREDENTIAL_HELPER=1
+[ "$(sysgit --global --get-all credential.helper)" = "$VS" ] || fail "the escape hatch did not keep the helper"
 
 echo "PASS: post-start.sh"

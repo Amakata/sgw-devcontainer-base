@@ -98,38 +98,8 @@ if ssh-add -l >/dev/null 2>&1; then
   fi
 fi
 
-# ---------------------------------------------------------------------------
-# sekimore-relay guardrail (part 2): close the route by which HTTPS git borrows the requester's
-# GitHub authentication. The VS Code Dev Containers extension plants two of them:
-#   (a) it writes git's credential.helper into /etc/gitconfig and ~/.gitconfig
-#   (b) it injects GIT_ASKPASS + VSCODE_GIT_IPC_HANDLE into every shell's environment (used by git's
-#       HTTP Basic authentication)
-# Either one lets a clone/push of https://github.com/... through with the requester's permissions,
-# around the gateway. Under the relay setup git is meant to go only over the gateway's SSH, so both
-# are disabled. git@github.com (SSH) is unaffected.
-#   - (a) is removed here (it cannot be disabled in devcontainer.json. The extension writes it every
-#     time, so it is undone on every start-up)
-#   - (b) is defused by rc.d/70-sekimore.zsh setting GIT_ASKPASS='' (interactive shells).
-#         For non-interactive tool invocations git's core.askpass cannot be emptied here
-#         (the environment wins), so the protection is removing the helper and funnelling
-#         everything through the SSH route.
-# To put it back temporarily, SEKIMORE_ALLOW_CREDENTIAL_HELPER=1.
-# ---------------------------------------------------------------------------
-disable_vscode_credential_helper() {
-  local scope changed=0 cur
-  for scope in system global; do
-    cur=$(git config --"$scope" --get-all credential.helper 2>/dev/null || true)
-    case "$cur" in
-      *vscode-remote-containers*|*vscode-server*)
-        git config --"$scope" --unset-all credential.helper 2>/dev/null || true
-        git config --"$scope" credential.helper "" 2>/dev/null || true
-        changed=1 ;;
-    esac
-  done
-  [ "$changed" = 1 ] && echo "[agent] relay: disabled the VS Code HTTPS git credential helper (git now goes over the gateway's SSH; keep it with SEKIMORE_ALLOW_CREDENTIAL_HELPER=1)"
-}
-if [ "${SEKIMORE_ALLOW_CREDENTIAL_HELPER:-0}" != "1" ]; then
-  disable_vscode_credential_helper
-fi
+# The guardrail's second part — taking out the HTTPS git credential helper the VS Code extension
+# plants — is .devcontainer/sgw/post-start.sh's. It runs on every start, before this file
+# (sgw-devcontainer-base 0.2.26).
 
 echo "✅ post-create done. Open a new terminal to pick up zsh settings."
