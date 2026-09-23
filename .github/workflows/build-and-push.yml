@@ -57,6 +57,9 @@ jobs:
       # post-start.sh against a fake sudo that lets through only what --preserve-env names.
       - name: post-start.sh
         run: tests/test_post_start.sh
+      # sgw.sh gives docker exec a terminal exactly when the person has one (under script(1)).
+      - name: sgw.sh terminal handling
+        run: tests/test_sgw_tty.sh
 
   # アーキごとに「その CPU のネイティブランナー」でビルドする (arm64 を QEMU で回さない)。
   # push / tag では digest だけ push し、merge ジョブで manifest list にまとめてタグ付けする。PR ではビルドのみ。
