@@ -20,6 +20,10 @@ DevContainer のベースイメージ — Dockerfile と焼き込む道具、同
 
 - ログインシェルでも mise の shims が PATH に乗る。`codex` / `node` / `npm` が使える。Debian の `/etc/profile` が PATH を追加ではなく代入していて、イメージの `ENV PATH` を捨てていた (#60)
 
+### Enhancement
+
+- README が「はじめかた」から始まる。What's inside は 1 項目 10 行の箇条書きをやめて表にした。README が見せる `FROM` の版はサンプルと照合する (4 版ぶん遅れていた) (#67)
+
 ## 0.2.29（2026-09-24）
 
 ### Fix
