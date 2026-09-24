@@ -14,6 +14,12 @@ DevContainer のベースイメージ — Dockerfile と焼き込む道具、同
 0.2.18 から始める。それ以前のリリースはここに書かない。各 PR とタグが記録。
 取り込んだ gateway の版だけは末尾にある。
 
+## 0.2.33（2026-09-24）
+
+### Enhancement
+
+- sekimore-gw 0.2.35 を取り込む。このイメージの CLI とガイドが `pr files` と `pr diff` を知るようになる。どちらも `pr:read` で PR の差分を読む (#173)
+
 ## 0.2.32（2026-09-24）
 
 ### Enhancement
