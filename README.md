@@ -2,11 +2,20 @@
 
 *[日本語版](README.ja.md)*
 
-**A devcontainer for handing an AI your development environment without handing it your keys.**
+**Hand an AI your development environment without handing it GitHub, or your keys.**
 
-VS Code's Dev Containers holds the environment inside a container — editor, terminal and
-AI agent all run in there, and **everything leaving it goes through the gateway
-(sekimore-gw)**. This image is the dev side of that arrangement.
+You want the agent to do the work. But a token gives it the `repo` scope — **read and write
+on every repository you can see** — and an agent with a terminal can read `~/.ssh` and `.env`.
+
+VS Code's Dev Containers holds the environment inside a container and **routes everything
+leaving it through the gateway (sekimore-gw)**, so the credentials stay outside the agent.
+What it holds is a disposable key that means nothing anywhere but the gateway.
+
+GitHub work goes through the `sekimore` command, and **which operations you allow is yours to
+choose** — `pr:create` yes, `pr:merge` no, and so on across 26 of them. `gh` is deliberately
+absent: given a token it goes straight past the gateway, and none of those choices would hold.
+
+This image is the dev side of that arrangement.
 
 ## What it gets you
 
