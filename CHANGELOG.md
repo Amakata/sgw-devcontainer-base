@@ -17,6 +17,12 @@ Starts at 0.2.18. Releases before it are not written up here; the pull requests
 and the tag on each are the record. The gateway each of them took is at the
 bottom.
 
+## 0.2.30 (2026-09-24)
+
+### Fix
+
+- a login shell finds the mise shims again, so `codex`, `node` and `npm` are on PATH there: Debian's `/etc/profile` assigns PATH rather than appending, throwing away the image's `ENV PATH` (#60)
+
 ## 0.2.29 (2026-09-24)
 
 ### Fix

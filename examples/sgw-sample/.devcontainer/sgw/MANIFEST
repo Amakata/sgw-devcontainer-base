@@ -1,6 +1,6 @@
 # Written by upgrade.sh: what it last put in this directory, so an edit by hand can be told
 # apart from a file it wrote. Do not edit.
-base 0.2.29
+base 0.2.30
 gateway 0.2.32
 lang en
 file sgw.sh 1f460ac16fb262b042d44bdd1c7d48139579b16f6e385bd507fddaf35c9bd929
