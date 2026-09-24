@@ -527,3 +527,27 @@ worse than redundant: it ends in `[ "$changed" = 1 ] && echo …`, which returns
 was nothing to remove, and under `set -e` that stops post-create.sh — and with it the
 container's start. The sample's copy also changed `/etc/gitconfig` without sudo, so it never
 took the system helper out.
+
+## base 0.2.28 `gh` is gone
+
+**Only if something you run calls `gh`.**
+
+The GitHub CLI is no longer in the image. It reached `api.github.com` through the relay's 443
+passthrough, which forwards without reading the request, so a `gh` holding a token acted on
+GitHub with none of the per-action permissions the relay enforces — `pr:merge` denied in
+`config.yml` did not stop `gh pr merge` — and against repositories outside the project.
+
+`sekimore` does the same work through the agent API, where each action is checked against the
+project and recorded:
+
+| instead of | use |
+|---|---|
+| `gh pr create` | `sekimore pr create --head <branch> --base <base> --title T --body="…"` |
+| `gh pr merge` | `sekimore pr merge --number N` |
+| `gh pr view` / `gh pr checks` | `sekimore pr status --number N` |
+| `gh issue create` | `sekimore issue create --title T` |
+| `gh run view` / `gh run view --log` | `sekimore ci jobs --number N` / `sekimore ci log --number N` |
+| `gh release create` | `sekimore release create --tag vX.Y.Z` |
+
+`sekimore guide` lists the rest. If a script of your own needs `gh`, install it there and know
+that what it does is outside what the relay can see or refuse.

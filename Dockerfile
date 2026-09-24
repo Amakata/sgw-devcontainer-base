@@ -8,7 +8,6 @@
 #   - common shell tooling (fzf, iproute2, jq, vim, rsync, ...)
 #   - DB client dev headers (libpq-dev, default-libmysqlclient-dev)
 #   - git-delta
-#   - GitHub CLI (gh)
 #   - zsh + oh-my-zsh + plugins
 #   - mise (jdx/mise) — unified version manager for python/node/ruby/php/rust/...
 #     (no specific language versions — those are downstream's responsibility).
@@ -22,6 +21,11 @@
 #   - Docker CE + buildx + compose plugin   (== devcontainers/features/docker-in-docker)
 #
 # What is NOT baked in (intentionally case-specific):
+#   - GitHub CLI (gh). Deliberately absent: api.github.com is reached through the relay's 443
+#     passthrough, which forwards without reading, so a `gh` holding a token would act on GitHub
+#     with none of the per-action permissions the relay enforces (pr:merge and the rest) and
+#     against repositories outside the project. `sekimore` covers the same ground through the
+#     agent API, where each action is checked and audited (#62)
 #   - sekimore-gw service itself (runs as a separate compose service)
 #   - /workspace contents, .env, config.yml, zsh rc.d overlays
 #   - anything pinned to a specific project layout
@@ -90,18 +94,6 @@ RUN ARCH=$(dpkg --print-architecture) && \
     wget -q "https://github.com/dandavison/delta/releases/download/${GIT_DELTA_VERSION}/git-delta_${GIT_DELTA_VERSION}_${ARCH}.deb" && \
     dpkg -i "git-delta_${GIT_DELTA_VERSION}_${ARCH}.deb" && \
     rm "git-delta_${GIT_DELTA_VERSION}_${ARCH}.deb"
-
-# ---------------------------------------------------------------------------
-# GitHub CLI (gh)
-# ---------------------------------------------------------------------------
-RUN install -m 0755 -d /etc/apt/keyrings && \
-    curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
-      | gpg --dearmor -o /etc/apt/keyrings/githubcli-archive-keyring.gpg && \
-    chmod a+r /etc/apt/keyrings/githubcli-archive-keyring.gpg && \
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
-      > /etc/apt/sources.list.d/github-cli.list && \
-    apt-get update && apt-get install -y --no-install-recommends gh && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # ---------------------------------------------------------------------------
 # AWS CLI v2  (replaces ghcr.io/devcontainers/features/aws-cli:1)

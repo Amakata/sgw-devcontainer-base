@@ -72,10 +72,21 @@ echo "== the agent guide ships in both languages"
 # ~/.local/bin, which the shell rc adds rather than ENV PATH.
 # `codex` is left out on purpose: the Dockerfile installs it but it is not on PATH in the built
 # image (sgw-devcontainer-base#60). Put it back here when that is fixed.
-for t in git delta gh zsh mise claude aws docker sekimore sekimore-agent-setup.sh; do
+for t in git delta zsh mise claude aws docker sekimore sekimore-agent-setup.sh; do
   in_image /bin/sh -lc "command -v $t >/dev/null" ||
     fail "$t is not on PATH in the image"
 done
 echo "== the tools the base promises are on PATH"
+
+# ---- and the ones it deliberately leaves out ----
+# `gh` reaches api.github.com through the relay's 443 passthrough, which forwards without reading:
+# a `gh` holding a token would act with none of the per-action permissions the relay enforces, and
+# on repositories outside the project. Absent on purpose, so its return is a failure (#62).
+for t in gh; do
+  if in_image /bin/sh -lc "command -v $t >/dev/null"; then
+    fail "$t is in the image; it bypasses the relay's permission checks, and sekimore covers it"
+  fi
+done
+echo "== the tools the base leaves out are absent"
 
 echo "PASS: the image holds gateway $GW"

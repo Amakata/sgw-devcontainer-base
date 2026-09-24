@@ -17,6 +17,12 @@ Starts at 0.2.18. Releases before it are not written up here; the pull requests
 and the tag on each are the record. The gateway each of them took is at the
 bottom.
 
+## 0.2.28 (2026-09-24)
+
+### Security
+
+- the GitHub CLI (`gh`) is no longer baked in: it reaches `api.github.com` through the relay's 443 passthrough, which forwards without reading, so a `gh` holding a token acts with none of the per-action permissions the relay enforces. `sekimore` covers the same ground through the agent API (#62)
+
 ## 0.2.27 (2026-09-24)
 
 ### Enhancement

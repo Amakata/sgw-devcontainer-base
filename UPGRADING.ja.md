@@ -505,3 +505,27 @@ HTTPS の credential helper を、起動のたびに、あなたの `post-create
 取り除くものが無いと 1 を返し、`set -e` の下で post-create.sh が止まり、コンテナの起動も
 失敗します。サンプルの写しは `/etc/gitconfig` を sudo 無しで書き換えていたので、system 側の
 helper も取り除けていませんでした。
+
+## base 0.2.28 `gh` が無くなった
+
+**自分が動かすものが `gh` を呼んでいる場合だけ。**
+
+GitHub CLI をイメージから外した。`api.github.com` へは関所の 443 passthrough を通っていた
+— 中身を読まずに中継する経路なので、トークンを持った `gh` は関所が課す操作ごとの権限を
+どれも受けずに GitHub を操作できた。`config.yml` で `pr:merge` を拒否しても
+`gh pr merge` は止まらず、案件外のリポジトリにも届いた。
+
+同じことは `sekimore` がエージェント API 経由でできる。そちらは操作ごとに案件の設定と
+照合され、記録も残る。
+
+| これの代わりに | これを使う |
+|---|---|
+| `gh pr create` | `sekimore pr create --head <branch> --base <base> --title T --body="…"` |
+| `gh pr merge` | `sekimore pr merge --number N` |
+| `gh pr view` / `gh pr checks` | `sekimore pr status --number N` |
+| `gh issue create` | `sekimore issue create --title T` |
+| `gh run view` / `gh run view --log` | `sekimore ci jobs --number N` / `sekimore ci log --number N` |
+| `gh release create` | `sekimore release create --tag vX.Y.Z` |
+
+残りは `sekimore guide` にある。自分のスクリプトがどうしても `gh` を要るなら、そこで
+入れることになるが、その操作は関所から見えず、止めることもできない。
