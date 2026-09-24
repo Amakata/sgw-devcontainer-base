@@ -2,9 +2,24 @@
 
 *[日本語版](README.ja.md)*
 
-The **base image** for a DevContainer. It assumes a network that goes through
-sekimore-gw (the security gateway), and bakes in only the project-independent part,
-so that every build after it is fast.
+**A devcontainer for handing an AI your development environment without handing it your keys.**
+
+VS Code's Dev Containers holds the environment inside a container — editor, terminal and
+AI agent all run in there, and **everything leaving it goes through the gateway
+(sekimore-gw)**. This image is the dev side of that arrangement.
+
+## What it gets you
+
+| | |
+|---|---|
+| **git without giving away a key** | The agent holds a disposable key that only the gateway accepts. What reaches GitHub is what the gateway sent on with your key |
+| **GitHub actions allowed one at a time** | `pr:merge` refused, `issue:create` allowed, and so on. Nothing reaches a repository outside the project |
+| **Nowhere but where you allowed** | An unlisted domain does not resolve, and naming its IP directly gets dropped by the firewall |
+| **A cap on what can leave** | The gateway counts the bytes sent to the destinations it handles, and cuts the connection when they pass the limit |
+| **Commits that stay Verified** | The signing key lives on the gateway side; dev can ask for a signature and nothing else |
+| **Builds that stay fast** | Everything but the language runtimes is already in the image |
+
+The gateway itself is documented in [sekimore-gw](https://github.com/Amakata/sekimore-gw).
 
 Published at: `ghcr.io/amakata/sgw-devcontainer-base`
 Platforms: `linux/amd64`, `linux/arm64`
