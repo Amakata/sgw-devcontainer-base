@@ -70,9 +70,10 @@ echo "== the agent guide ships in both languages"
 # calls case-specific (uv, language runtimes) are deliberately not here.
 # A login shell, because that is how a person and a `docker exec -l` reach them; some land in
 # ~/.local/bin, which the shell rc adds rather than ENV PATH.
-# `codex` is left out on purpose: the Dockerfile installs it but it is not on PATH in the built
-# image (sgw-devcontainer-base#60). Put it back here when that is fixed.
-for t in git delta zsh mise claude aws docker sekimore sekimore-agent-setup.sh; do
+# node, npm and codex come from the mise shims, which Debian's /etc/profile would drop from a
+# login shell if /etc/profile.d did not put them back (#60) — so checking them here is checking
+# that too.
+for t in git delta zsh mise claude codex node npm aws docker sekimore sekimore-agent-setup.sh; do
   in_image /bin/sh -lc "command -v $t >/dev/null" ||
     fail "$t is not on PATH in the image"
 done

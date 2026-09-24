@@ -14,6 +14,12 @@ DevContainer のベースイメージ — Dockerfile と焼き込む道具、同
 0.2.18 から始める。それ以前のリリースはここに書かない。各 PR とタグが記録。
 取り込んだ gateway の版だけは末尾にある。
 
+## 0.2.30（2026-09-24）
+
+### Fix
+
+- ログインシェルでも mise の shims が PATH に乗る。`codex` / `node` / `npm` が使える。Debian の `/etc/profile` が PATH を追加ではなく代入していて、イメージの `ENV PATH` を捨てていた (#60)
+
 ## 0.2.29（2026-09-24）
 
 ### Fix

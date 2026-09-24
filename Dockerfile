@@ -166,6 +166,22 @@ USER ${USERNAME}
 # interactive-only cd hook on top of this.
 ENV PATH="/home/${USERNAME}/.local/share/mise/shims:${PATH}"
 
+# ...and put it back for LOGIN shells, which is the one path ENV does not cover.
+# Debian's /etc/profile assigns PATH rather than appending to it, so a login shell
+# (`docker exec -l`, `sh -lc`, a terminal a person opens) throws the line above away
+# and loses node, npm and codex with it (#60). /etc/profile.d runs after that
+# assignment, so this is where it goes back.
+USER root
+RUN printf '%s\n' \
+      '# mise shims: /etc/profile assigns PATH, so a login shell would drop the image ENV (#60)' \
+      'case ":$PATH:" in' \
+      '  *":$HOME/.local/share/mise/shims:"*) ;;' \
+      '  *) PATH="$HOME/.local/share/mise/shims:$PATH" ;;' \
+      'esac' \
+      'export PATH' \
+    > /etc/profile.d/05-mise-shims.sh && chmod 0644 /etc/profile.d/05-mise-shims.sh
+USER ${USERNAME}
+
 
 # Claude Codeの設定ファイルを配置
 USER root
