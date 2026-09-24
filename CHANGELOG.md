@@ -17,6 +17,12 @@ Starts at 0.2.18. Releases before it are not written up here; the pull requests
 and the tag on each are the record. The gateway each of them took is at the
 bottom.
 
+## 0.2.32 (2026-09-24)
+
+### Enhancement
+
+- takes sekimore-gw 0.2.34, so the CLI and the agent guide in this image know `pr comment-edit` / `comment-delete` and the `issue` pair (#174)
+
 ## 0.2.31 (2026-09-24)
 
 ### Enhancement
