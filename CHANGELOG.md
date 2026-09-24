@@ -17,6 +17,12 @@ Starts at 0.2.18. Releases before it are not written up here; the pull requests
 and the tag on each are the record. The gateway each of them took is at the
 bottom.
 
+## 0.2.29 (2026-09-24)
+
+### Fix
+
+- `post-start.sh` says so when a project's `post-create.sh` still defines `disable_vscode_credential_helper`: the copy 0.2.26 made unnecessary ends in a test that is false once the helper is gone, and `set -e` then stops the start with nothing said (#64)
+
 ## 0.2.28 (2026-09-24)
 
 ### Security
