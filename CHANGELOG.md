@@ -17,6 +17,12 @@ Starts at 0.2.18. Releases before it are not written up here; the pull requests
 and the tag on each are the record. The gateway each of them took is at the
 bottom.
 
+## 0.2.31 (2026-09-24)
+
+### Enhancement
+
+- takes sekimore-gw 0.2.33, so the CLI and the agent guide in this image know `pr reply`, review comments on a line, `ci dispatch` and draft pull requests (#165 #167 #168 #169)
+
 ## 0.2.30 (2026-09-24)
 
 ### Fix
