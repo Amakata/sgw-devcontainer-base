@@ -60,6 +60,9 @@ jobs:
       # sgw.sh gives docker exec a terminal exactly when the person has one (under script(1)).
       - name: sgw.sh terminal handling
         run: tests/test_sgw_tty.sh
+      # Every file that repeats a version agrees with ARG SEKIMORE_GW_IMAGE, the one that decides it.
+      - name: the versions agree with the Dockerfile
+        run: tests/test_versions.sh
 
   # アーキごとに「その CPU のネイティブランナー」でビルドする (arm64 を QEMU で回さない)。
   # push / tag では digest だけ push し、merge ジョブで manifest list にまとめてタグ付けする。PR ではビルドのみ。
@@ -107,9 +110,19 @@ jobs:
           file: ./Dockerfile
           platforms: ${{ matrix.platform }}
           push: false
+          # load so the next step can open the image. Each row already builds for the
+          # architecture its own runner has, so the image is always runnable here.
+          load: true
+          tags: sgw-devcontainer-base:pr
           provenance: false
           cache-from: type=gha,scope=${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
+
+      # The files can all agree and the image still hold the wrong relay — a COPY that names a
+      # path that moved, or a stage resolving to another tag. This asks the image itself.
+      - name: what the image holds
+        if: github.event_name == 'pull_request'
+        run: tests/test_image.sh sgw-devcontainer-base:pr
 
       - name: Build and push by digest (${{ matrix.arch }})
         if: github.event_name != 'pull_request'
