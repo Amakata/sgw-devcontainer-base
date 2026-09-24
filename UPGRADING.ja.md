@@ -1,4 +1,4 @@
-<!-- reviewed-up-to: 0.2.36 -->
+<!-- reviewed-up-to: 0.2.37 -->
 # 更新のしかた：版ごとに必要な変更
 
 *[English](UPGRADING.md)*
@@ -33,6 +33,7 @@ changelog を参照してください。
 | 0.2.22 〜 0.2.26 | [0.2.27](#0227-タグは署名が必須になった)。**エージェントがタグを push する場合だけ** |
 | 0.2.27 | [0.2.28](#0228-dependabot-アラートは任意)。**エージェントに Dependabot アラートを読ませたい場合だけ** |
 | 0.2.28 | [0.2.29](#0229-解錠を自動化できるようになった)。**解錠を自動化したい場合、または AI のコミットを Verified のままにしたい場合だけ** |
+| 0.2.29 〜 0.2.36 | [0.2.37](#0237-ゲートウェイに-pid-host-が要る)。**すべてのプロジェクト** |
 
 ゲートウェイの版とは別に、base 0.2.20 より前に作ったプロジェクトは、一度だけ手作業で
 `.devcontainer/sgw/` に移行する必要があります。
@@ -430,6 +431,42 @@ relay:
 上流が既に持っているかを問い合わせます。この問い合わせが無いと、delta の後ろに隠れたコミットを
 pack の中から区別できません。そのためゲートウェイが解錠され（`mise run gw:unlock`）、login 済みである
 必要があります。そうでない場合、push は安全側に倒れて失敗し、どの条件が欠けているかをメッセージが示します。
+
+## 0.2.37 ゲートウェイに pid: host が要る
+
+**すべてのプロジェクトで作業が必要です。** これまでエージェントを閉じ込めていたのは、コンテナの中だけでした。
+dev の root プロセスは `ip route replace default via <ブリッジの .1>` を実行すると、Docker 自身の NAT
+を通って外に出られました。ゲートウェイのフィルタはどれも通りません。0.2.37 から、ゲートウェイはホストの
+`DOCKER-USER` チェーンに FORWARD 規則を 2 つ追加します。内部ブリッジからの通信はゲートウェイの居るその
+ブリッジの中にしか届かず、外へ出るものは落とされます。規則の追加には `nsenter` でホストの名前空間に
+入るので、ゲートウェイはホストの PID 名前空間を必要とします。
+
+`.devcontainer/docker-compose.yml` の `sekimore-gw` サービスに `pid: host` を追加します
+（雛形には含まれています）。`dev` には追加しないでください。
+
+```yaml
+services:
+  sekimore-gw:
+    privileged: true
+    pid: host                 # dev を閉じ込める FORWARD 規則はホストの DOCKER-USER チェーンにある
+```
+
+そのあと `mise run gw:recreate` を実行します。`pid: host` が無くてもゲートウェイは起動しますが、
+エージェントは閉じ込められて**いません**。
+
+規則が入ったことは、ゲートウェイのログで確認します。
+
+```bash
+docker logs "$(bash .devcontainer/sgw/sgw.sh id sekimore-gw)" 2>&1 | grep 'FORWARD enforcement'
+```
+
+"Host-side FORWARD enforcement in place" と表示されます。`pid: host` が無いと、
+"Host-side FORWARD enforcement is not in place" と理由が表示されます。
+
+`mise run relay:verify` も迂回そのものを確かめます。dev からブリッジ自身のルーター経由のホストルートを
+追加し、接続が失敗することを期待します。
+
+0.2.30 〜 0.2.36 では作業は不要です。
 
 ## base 0.2.19 `mise run web` が自分でポートを引く
 

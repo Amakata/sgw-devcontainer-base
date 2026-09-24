@@ -14,6 +14,14 @@ DevContainer のベースイメージ — Dockerfile と焼き込む道具、同
 0.2.18 から始める。それ以前のリリースはここに書かない。各 PR とタグが記録。
 取り込んだ gateway の版だけは末尾にある。
 
+## 0.2.35（2026-09-25）
+
+### Security
+
+- sekimore-gw 0.2.37 を取り込む。ホストの `DOCKER-USER` チェーンに FORWARD 規則を置き、内部ブリッジからはゲートウェイにしか届かなくする。dev の root プロセスが Docker の NAT でゲートウェイを迂回できなくなる (#189)
+- サンプルのゲートウェイのサービスが、この規則に必要な `pid: host` で動く。プロジェクトは自分の `.devcontainer/docker-compose.yml` に追加する必要がある。[UPGRADING](UPGRADING.ja.md#0237-ゲートウェイに-pid-host-が要る) を参照
+- `relay:verify` が迂回を確かめる。dev からブリッジ自身のルーター経由でホストルートを張っても、インターネットに届いてはならない
+
 ## 0.2.34（2026-09-24）
 
 ### Security
