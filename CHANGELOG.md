@@ -23,6 +23,10 @@ bottom.
 
 - a login shell finds the mise shims again, so `codex`, `node` and `npm` are on PATH there: Debian's `/etc/profile` assigns PATH rather than appending, throwing away the image's `ENV PATH` (#60)
 
+### Enhancement
+
+- the README starts with how to start: Getting started opens the file, and What's inside is a table rather than a list of ten-line items. The `FROM` line it shows is checked against the sample's, which had been four releases behind (#67)
+
 ## 0.2.29 (2026-09-24)
 
 ### Fix
