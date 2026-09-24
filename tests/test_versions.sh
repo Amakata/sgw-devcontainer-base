@@ -55,7 +55,7 @@ for f in README.md README.ja.md; do
     [ "$n" = "$GW" ] ||
       fail "$f still says this image and the gateway are level at $n; the Dockerfile takes $GW"
   done <<EOF
-$(sed -n 's|.*this image takes \([0-9][0-9]*\.[0-9.]*[0-9]\) and the gateway is at \([0-9][0-9]*\.[0-9.]*[0-9]\).*|\1\n\2|p; s|.*(このイメージも gateway も \([0-9][0-9]*\.[0-9.]*[0-9]\)).*|\1|p' "$ROOT/$f")
+$(sed -n 's|.*this image takes \([0-9][0-9]*\.[0-9.]*[0-9]\) and the gateway is at \([0-9][0-9]*\.[0-9.]*[0-9]\).*|\1\n\2|p; s|.*(このイメージもゲートウェイも \([0-9][0-9]*\.[0-9.]*[0-9]\)).*|\1|p' "$ROOT/$f")
 EOF
 done
 

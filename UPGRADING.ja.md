@@ -1,60 +1,61 @@
 <!-- reviewed-up-to: 0.2.36 -->
-# 更新のしかた (版ごとに必要な作業)
+# 更新のしかた：版ごとに必要な変更
 
 *[English](UPGRADING.md)*
 
-**ここに載っているのは、あなたが持っているファイルを触る必要がある版だけです。**
-載っていない版は、`mise run upgrade:apply` だけで済みます (base 0.2.20 より前は、イメージの
-タグを上げて `mise run gw:recreate`)。
-何が変わったかは changelog にあります —
-[gateway](https://github.com/Amakata/sekimore-gw/blob/main/CHANGELOG.ja.md) /
+**このガイドに載せているのは、あなたが持っているファイルの変更が必要な版だけです。**
+載っていない版は、`mise run upgrade:apply` を実行するだけで更新が完了します（base 0.2.20 より前は、
+代わりにイメージのタグを上げて `mise run gw:recreate` を実行します）。各版で何が変わったかは
+changelog を参照してください。
+[ゲートウェイ](https://github.com/Amakata/sekimore-gw/blob/main/CHANGELOG.ja.md) /
 [relay](https://github.com/Amakata/sekimore-gw/blob/main/relay/CHANGELOG.ja.md) /
-[base](CHANGELOG.ja.md)。
+[base](CHANGELOG.ja.md)
 
-「あなたが持っているファイル」とは、雛形から複製したもののことです。
+「あなたが持っているファイル」とは、雛形から複製したファイルのことです。
 
-| ファイル | 誰のものか |
+| ファイル | 持ち主 |
 |---|---|
-| `.devcontainer/config/config.yml` | あなた。関所の設定はここ |
-| `mise.toml` | あなた。ホスト側のタスクを include し、自分のタスクを置く |
-| `.devcontainer/docker-compose.yml` | あなた。gateway の image タグはここ (`upgrade:apply` が書き換えるのはタグだけ) |
-| `.devcontainer/sgw/` | base 0.2.20 から**あなたのものではない**。`upgrade:apply` が入れ替える。それより前は `.devcontainer/scripts/sgw.sh` があなたのものだった |
+| `.devcontainer/config/config.yml` | あなた。関所（sekimore-relay）の設定が書かれています。 |
+| `mise.toml` | あなた。ホスト側のタスクを include し、あなた自身のタスクを置きます。 |
+| `.devcontainer/docker-compose.yml` | あなた。ゲートウェイのイメージタグが書かれています（`upgrade:apply` が書き換えるのはタグだけです）。 |
+| `.devcontainer/sgw/` | base 0.2.20 からは**あなたのものではありません**。`upgrade:apply` が入れ替えます。base 0.2.20 より前は、`.devcontainer/scripts/sgw.sh` をあなたが持っていました。 |
 
 ## いまの版から読む場所
 
-| いまの gateway | 読む項目 |
+| いまのゲートウェイ | 読む節 |
 |---|---|
-| 0.0.x | [0.1.0](#010-関所-relay-が入った) から順に全部。ただし関所を使わないなら**何も要りません** |
+| 0.0.x | [0.1.0](#010-関所-relay-が入った) 以降。関所を使わないなら、**何もする必要はありません**。 |
 | 0.1.0 〜 0.1.8 | [0.1.9](#019-権限の書き方が変わった) 以降 |
 | 0.1.9 〜 0.2.6 | [0.2.7](#027-projects-のボードを宣言する-破壊的) 以降 |
 | 0.2.7 〜 0.2.14 | [0.2.15](#0215-秘密ストアが増えた) 以降 |
 | 0.2.15 〜 0.2.18 | [0.2.19](#0219-解錠が必須になった) |
-| 0.2.19 〜 0.2.21 | [0.2.22](#0222-proxy-の認証情報がストアに移った) — **上流 proxy にパスワードが要る場合だけ** |
-| 0.2.22 〜 0.2.26 | [0.2.27](#0227-タグは署名が必須になった) — **エージェントにタグを push させている場合だけ** |
-| 0.2.27 | [0.2.28](#0228-dependabot-アラートは任意) — **エージェントに Dependabot アラートを読ませたい場合だけ** |
-| 0.2.28 | [0.2.29](#0229-解錠を自動化できるようになった) — **解錠を自動化したい場合か、AI のコミットを Verified のままにしたい場合だけ** |
+| 0.2.19 〜 0.2.21 | [0.2.22](#0222-proxy-の認証情報がストアに移った)。**上流 proxy がパスワードを要求する場合だけ** |
+| 0.2.22 〜 0.2.26 | [0.2.27](#0227-タグは署名が必須になった)。**エージェントがタグを push する場合だけ** |
+| 0.2.27 | [0.2.28](#0228-dependabot-アラートは任意)。**エージェントに Dependabot アラートを読ませたい場合だけ** |
+| 0.2.28 | [0.2.29](#0229-解錠を自動化できるようになった)。**解錠を自動化したい場合、または AI のコミットを Verified のままにしたい場合だけ** |
 
-gateway とは別に、base 0.2.20 より前のプロジェクトは一度だけ手で `.devcontainer/sgw/` に移します —
-[base 0.2.20](#base-0220-devcontainersgw-と-mise-run-upgrade)。以後は、ここの節をまたぐたびに
-`mise run upgrade` が一覧に出します。
+ゲートウェイの版とは別に、base 0.2.20 より前に作ったプロジェクトは、一度だけ手作業で
+`.devcontainer/sgw/` に移行する必要があります。
+[base 0.2.20](#base-0220-devcontainersgw-と-mise-run-upgrade) を参照してください。移行後は、
+更新でまたぐこのガイドの節を `mise run upgrade` が一覧表示します。
 
 ---
 
 ## 0.1.0 関所 (relay) が入った
 
-**opt-in です。** `config.yml` に `domain_handlers` と `relay` を書かなければ関所は起動せず、
-0.0.x と同じ DNS フィルタ・ファイアウォール・Squid のままです。設定キーの削除も改名も
-ありません (`allow_domains` / `block_domains` / `allow_ips` / `block_ips` / `proxy` /
-`network` / `database_path` はそのまま通ります)。
+**関所は opt-in です。** `config.yml` に `domain_handlers` と `relay` が無ければ関所は起動せず、
+ゲートウェイは 0.0.x と同じように動きます。DNS フィルタ、ファイアウォール、Squid は変わりません。
+設定キーの削除や改名はありません。`allow_domains`、`block_domains`、`allow_ips`、`block_ips`、
+`proxy`、`network`、`database_path` は、いずれも引き続き解釈されます。
 
-関所を使うなら、README の
-[「0.0.8 以前の gateway から上げる場合」](README.md#008-以前の-gateway-から上げる場合) を参照。
+関所を導入する場合は、README の
+[「0.0.8 以前の gateway から上げる場合」](README.md#008-以前の-gateway-から上げる場合)を参照してください。
 
 ## 0.1.9 権限の書き方が変わった
 
-`relay.allow_tags` / `relay.allow_delete` が非推奨になりました。**まだ読まれます** —
-起動時に警告を出しつつ `relay.project` の既定に畳まれるので、放っておいても動きます。
-移すなら:
+`relay.allow_tags` と `relay.allow_delete` は非推奨になりました。**関所は引き続きこれらを読みます**。
+起動時に警告を出し、`relay.project` の既定値に畳み込みます。そのまま残しても動作は壊れません。
+移行する場合は、次のように書きます。
 
 ```yaml
 relay:
@@ -65,9 +66,9 @@ relay:
 
 ## 0.2.7 Projects のボードを宣言する (破壊的)
 
-**Projects v2 を使っているなら作業が要ります。** 触ってよいボードを宣言しないと、
-Projects の操作が**全て拒否**されます。ボードの node id は不透明で所有者を示さないため、
-宣言が無いと上流トークンから見える任意のボードに届いてしまうからです。
+**Projects v2 を使っている場合は作業が必要です。** このプロジェクトが操作してよいボードを列挙しないと、
+関所は Projects の操作を**すべて**拒否します。ボードの node ID は不透明で、所有者を示しません。
+そのため一覧が無いと、上流トークンから見える任意のボードにエージェントが届いてしまいます。
 
 ```yaml
 relay:
@@ -77,72 +78,76 @@ relay:
       - { user: someone, number: 1 }   # github.com/users/someone/projects/1
 ```
 
-Projects を使っていなければ何も要りません。
+Projects を使っていなければ、作業は不要です。
 
-同じ版で `handler: git-relay` が `handler: github` に改名されましたが、
-**別名として残っている**ので書き換えは不要です。
+同じ版で `handler: git-relay` が `handler: github` に改名されました。旧名は
+**別名として引き続き使える**ので、書き換える必要はありません。
 
 ## 0.2.13 設定の反映に窓ができた
 
-既定は `auto` で、それまでと同じ挙動です。ただし `config.yml` は dev から書けるので、
-**AI に作業を渡すなら閉じておくべきです。**
+既定値は `auto` で、これまでと同じ動作です。ただし `config.yml` は dev コンテナから書き込めるため、
+**エージェントに作業を渡す前に、反映の窓を閉じてください。**
 
 ```yaml
 reload: manual        # または 30m のような時間
 ```
 
 ```bash
-mise run gw:reload-freeze    # いま閉じる
-mise run gw:reload-status    # いまどちらか
+mise run gw:reload-freeze    # いますぐ窓を閉じる
+mise run gw:reload-status    # 窓が開いているか閉じているかを表示する
 ```
 
-`mise.toml` に `gw:reload-*` の3タスクが要ります（雛形にあります）。
+これらのコマンドには、`mise.toml` に `gw:reload-*` の 3 つのタスクが必要です。雛形には含まれています。
 
 ## 0.2.15 秘密ストアが増えた
 
-`mise.toml` に解錠のタスクが要ります。`sgw.sh` には **`gw-tty`** が要ります —
-パスフレーズのプロンプトに端末を渡す経路で、通常の `gw` は stdout も端末でないと
-`-t` を付けないため、mise 経由だと端末が無くなります。
+`mise.toml` には解錠のタスクが、`sgw.sh` には **`gw-tty`** の分岐が必要です。`gw-tty` は、
+パスフレーズのプロンプトを端末につなぎます。通常の `gw` 分岐は、stdout も端末である場合にだけ
+`-t` を付けます。タスクランナーは stdout をパイプにするので、`gw-tty` が無いとプロンプトに端末が
+つながりません。
 
-雛形から取り込んでください:
+両方を雛形から取り込んでください。
 
 ```bash
 diff -u <base>/examples/sgw-sample/mise.toml mise.toml
 diff -u <base>/examples/sgw-sample/.devcontainer/scripts/sgw.sh .devcontainer/scripts/sgw.sh
 ```
 
-必要なタスク: `gw:unlock` `gw:lock` `gw:store-status` `gw:passphrase`
+必要なタスクは `gw:unlock`、`gw:lock`、`gw:store-status`、`gw:passphrase` です。
 
 ## 0.2.18 ストアの控えが取れるようになった
 
-`gw:store-export` / `gw:store-import` を `mise.toml` に。施錠中でも控えを取れます
-(鍵が要らないため)。封じてありますが、**守っているのはパスフレーズだけ**です。
+`mise.toml` に `gw:store-export` と `gw:store-import` を追加してください。export には鍵が不要なので、
+施錠中のストアでも export できます。export したものは封じられたままですが、
+**それを守るのはパスフレーズだけです**。
 
 ## 0.2.19 解錠が必須になった
 
-**上流 API トークンが秘密ストアに入りました。解錠しないと関所が GitHub API を使えません。**
-git の push / pull は SSH なので影響しません。
+**上流 API トークンが秘密ストアに保存されるようになったため、ストアを解錠するまで関所は GitHub API
+に届きません。** git の push と pull は SSH を使うので影響を受けません。
 
-- ゲートウェイを作り直したら、再起動したら、**毎回 `mise run gw:unlock`**。鍵はメモリにしかありません
-- `whoami` / `check` / `logout` は関所が動いていないと使えません (制御ソケット経由になったため)
-- 既存の `/data/relay/upstream_token` は最初の読み取りでストアへ移って消えます。**手作業は不要です**
+- ゲートウェイを作り直したとき、または再起動したときは、**毎回** `mise run gw:unlock` を実行してください。
+  鍵はメモリ上にしか存在しません。
+- `whoami`、`check`、`logout` は関所の制御ソケットを使うため、関所が動いている必要があります。
+- 既存の `/data/relay/upstream_token` は、関所が最初に読んだときにストアへ移され、その後削除されます。
+  **手作業は不要です。**
 
-0.2.15 の作業を飛ばしていると、ここで詰みます (`gw:unlock` が無く、足しても `gw-tty` が無い)。
-先に 0.2.15 の項を済ませてください。
+0.2.15 を飛ばしている場合は、ここから先に進めません。`gw:unlock` が無く、追加しても `gw-tty` が
+無いと動かないためです。先に 0.2.15 の節を済ませてください。
 
-同じ版で、上流が既に広告しているタグを動かす push が拒否されるようになりました。
-**新しいタグを切るのは今までどおり**なので、リリース手順は変わりません。
+同じ版で、上流が既に広告しているタグを動かす push は拒否されるようになりました。
+**新しいタグの作成には影響しない**ので、リリース手順は変わりません。
 
 ## 0.2.20 タスクが gateway から来るようになった
 
-**任意。ただし一度やる価値がある。** イメージが `gw:*` タスクを持つようになったので、
-プロジェクト側で複製を抱える必要がなくなりました:
+**この作業は任意ですが、一度実施することを推奨します。** イメージが自身の `gw:*` タスクを
+持つようになったため、プロジェクト側で複製を持つ必要がなくなりました。
 
-雛形 (`examples/sgw-sample/`) はこの形になっているので、新規はそのまま始まります。
-既存のプロジェクトは `gw:sync-tasks` を足してから一度走らせます:
+雛形（`examples/sgw-sample/`）は既にこの構成なので、新しいプロジェクトは雛形から始められます。
+既存のプロジェクトは、`gw:sync-tasks` を追加して一度実行します。
 
 ```toml
-# mise.toml — これだけは自分で持つ。イメージから配れない (取り出す側なので)
+# mise.toml — これだけは自分で持つ。イメージから取り出すタスクそのものなので、イメージからは配れない
 [tasks."gw:sync-tasks"]
 description = "動いているゲートウェイから gw:* タスクを取り出す (gw:recreate のあとに実行する)"
 run = "bash \"$SGW\" gw cat /usr/local/share/sekimore/gateway.mise.ja.toml > \"$MISE_PROJECT_ROOT/.devcontainer/gateway.mise.toml\" && echo wrote"
@@ -161,59 +166,62 @@ includes = [".devcontainer/gateway.mise.toml"]
 SGW = "{{config_root}}/.devcontainer/scripts/sgw.sh"
 ```
 
-`mise run gw:recreate` のたびに取り直せば、タスクは常に動いている gateway のものになります。
-上の 0.2.15 と 0.2.19 が罠になっていた原因は、これで消えます。
+`mise run gw:recreate` を実行するたびに、タスクを取り出し直してください。これでタスクは常に、
+動いているゲートウェイのものと一致します。上の 0.2.15 と 0.2.19 の更新で作業を誤りやすかった原因である
+複製のずれは、これで起きなくなります。
 
-`sgw.sh` は引き続きあなたのもので、`gw-tty` が要ります。同梱ファイルの冒頭に、
-どの原始的な口を使うか4つ書いてあります。
+`sgw.sh` は引き続きあなたが持ち、`gw-tty` を含んでいる必要があります。同梱のタスクファイルの冒頭に、
+タスクが使う `sgw.sh` の 4 つの基本操作が書かれています。
 
-**取り出したファイルはコミットしてください。** `mise` は include 先が無くても
-**エラーも警告も出さず黙って無視します**。gitignore すると、clone した人の環境で
-`gw:*` が「静かに存在しない」状態になります。コミットしておけば、ゲートウェイを
-更新したときの差分が `git diff` に出るという利点もあります。
+**取り出したファイルはコミットしてください。** `mise` は、include するファイルが無くても
+**エラーも警告も出さずに無視します**。このファイルを `.gitignore` に入れると、次にリポジトリを clone
+した人の環境には `gw:*` タスクが一つも存在せず、それを知らせるものもありません。コミットしておけば、
+ゲートウェイの更新が `git diff` に現れます。更新が目に見えるのはそこだけです。
 
 ## 0.2.22 proxy の認証情報がストアに移った
 
-**パスワードを求める社内 proxy の背後にある gateway だけ。** それ以外はやることなし。
+**この節は、パスワードを要求する社内 proxy の背後にあるゲートウェイだけが対象です。** それ以外の場合、
+作業は不要です。
 
-`config.yml` の `upstream_proxy_username` / `upstream_proxy_password` と、
-環境変数 `SEKIMORE_UPSTREAM_PROXY_*` は dev コンテナから読めます。`config.yml` は
-worktree の中にあり、`.devcontainer/.env` はエージェント自身の `env_file` だからです。
-認証情報の置き場所はシークレットストアです:
+`config.yml` の `upstream_proxy_username` と `upstream_proxy_password`、および環境変数
+`SEKIMORE_UPSTREAM_PROXY_*` は、dev コンテナから読めます。`config.yml` は worktree の中にあり、
+`.devcontainer/.env` はエージェント自身の `env_file` だからです。資格情報は秘密ストアに保存してください。
 
 ```bash
-mise run gw:proxy-credential -- set     # ユーザー名とパスワードは端末で聞かれる
+mise run gw:proxy-credential -- set     # ユーザー名とパスワードを端末で尋ねる
 ```
 
-そのあと `config.yml` から2つのキーを、置いていた場所から2つの環境変数を消して、
-`mise run gw:recreate`。残しておいても**引き続き読まれる**ので破壊的変更ではありません。
-穴を閉じるのは消すほうです。
+そのあと、`config.yml` から 2 つのキーを、設定していた場所から 2 つの環境変数を削除し、
+`mise run gw:recreate` を実行します。残しておいてもゲートウェイは**引き続き読む**ので、破壊的変更では
+ありません。ただし、露出をなくすには削除する必要があります。
 
-ストアが起動時に封じられていることから、2つ従うことがあります:
+ストアは起動時に封じられているため、次の 2 点が生じます。
 
-- `mise run gw:unlock` までは Squid は上流認証**なし**で動き、ストアが開くと自分で
-  認証情報を拾います。匿名を拒む proxy の背後でも gateway は起動します。unlock より前に
-  proxy を通るものが無いからです
-- `gw:proxy-credential` は gateway のタスクです。`mise run gw:sync-tasks` のあと
-  include（[0.2.20](#0220-タスクが-gateway-から来るようになった)）経由で届きます
+- `mise run gw:unlock` を実行するまで、Squid は上流認証**なし**で動き、ストアが解錠されると自動で
+  資格情報を読み込みます。匿名のリクエストを拒否する proxy の背後でもゲートウェイは起動します。解錠前に
+  ゲートウェイから proxy を通る通信が無いためです。
+- `gw:proxy-credential` はゲートウェイのタスクです。`mise run gw:sync-tasks` を実行すると、include
+  （[0.2.20](#0220-タスクが-gateway-から来るようになった)）経由で使えるようになります。
 
-0.2.21 と 0.2.23 〜 0.2.26 は何も求めません。
+0.2.21 と 0.2.23 〜 0.2.26 では作業は不要です。
 
 ## 0.2.27 タグは署名が必須になった
 
-**`tags:` の glob でエージェントにタグの push を許している案件だけ。** それ以外はやることなし。
+**この節は、`tags:` の glob でエージェントにタグの push を許しているプロジェクトだけが対象です。**
+それ以外のプロジェクトでは作業は不要です。
 
-push されるタグは、署名を持つ注釈付き tag オブジェクトでなければ通りません。`git tag -s`
-で、形式は git が知るどれでも（OpenPGP / SSH / X.509）。軽量タグ（`git tag v1`）と署名なしの
-注釈付きタグ（`git tag -a`）は `[remote rejected]` と理由付きで拒否されます。relay が見るのは
-署名が**ある**ことだけで、誰の署名かは見ません。
+push するタグは、署名を持つ注釈付きタグオブジェクトでなければならなくなりました。`git tag -s` で、
+git が対応する任意の形式（OpenPGP、SSH、X.509）で作成します。関所は、軽量タグ（`git tag v1`）と
+署名の無い注釈付きタグ（`git tag -a`）を、`[remote rejected]` と理由を示すメッセージとともに拒否します。
+関所が確認するのは署名が**ある**ことだけで、誰の署名かは確認しません。
 
-dev コンテナ側はもう署名しています。`agent-setup.sh` がエージェントの SSH 署名鍵で
-`tag.gpgsign true` を入れるので、そこでは `git tag -s` も素の `git tag -a` も署名付きになります。
-捕まえるのはそれを**回り込んだ**タグ — `-c tag.gpgsign=false` や、設定の無いシェルから打った
-もの — で、gateway 自身の最初の `v0.2.18` はそうして上がりました。
+dev コンテナは既にタグに署名します。`agent-setup.sh` がエージェントの SSH 署名鍵で
+`tag.gpgsign true` を設定するので、そこでは `git tag -s` も素の `git tag -a` も署名付きのタグになります。
+この検査が捕まえるのは、この設定を**迂回した**タグです。たとえば `-c tag.gpgsign=false` を付けて
+作ったタグや、設定の無いシェルから作ったタグです。ゲートウェイ自身の最初の `v0.2.18` タグは、
+このようにして push されました。
 
-この検査を外したければ、どの層でも 1 行です:
+この検査を無効にするには、任意の設定の層に 1 行追加します。
 
 ```yaml
 # .devcontainer/config/config.yml
@@ -222,18 +230,18 @@ relay:
     signed_tags: false          # upstreams.<domain> の下でも、repos[] の 1 件にでも書ける
 ```
 
-そのあと `mise run gw:recreate`。`mise run gw:check` が repo ごとの実効値
-（`signed_tags=true|false`）を出します。
+そのあと `mise run gw:recreate` を実行します。`mise run gw:check` は、リポジトリごとの実効値
+（`signed_tags=true|false`）を表示します。
 
-0.2.23 〜 0.2.26 は何も求めません。
+0.2.23 〜 0.2.26 では作業は不要です。
 
 ## 0.2.28 Dependabot アラートは任意
 
-**使いたいときだけ。** 権限キーが 2 つ増えました。`security:read`（リポジトリの Dependabot
-アラートの一覧・詳細）と `security:dismiss`（理由を付けて脇に置く・戻す）。どちらも既存の
-設定では付きません。
+**Dependabot アラートを使わないなら、作業は不要です。** この版で権限キーが 2 つ追加されました。
+`security:read`（リポジトリの Dependabot アラートの一覧と詳細の表示）と、`security:dismiss`
+（理由を付けてアラートを却下する、または再度開く）です。既存の設定では、どちらも付与されません。
 
-使うなら:
+有効にするには、次のように書きます。
 
 ```yaml
 # .devcontainer/config/config.yml
@@ -244,84 +252,88 @@ relay:
       # - security:dismiss      # 脆弱性を見えなくするのは別の権限。意図して付ける
 ```
 
-そのあと `mise run gw:recreate`、**さらに `mise run gw:login` をもう一度**。alerts API には
-`security_events` の OAuth scope が要り、0.2.28 より前の login は要求していません。無いと
-`sekimore security alerts` は GitHub の 403 を受けます。
+そのあと `mise run gw:recreate` を実行し、**さらに `mise run gw:login` をもう一度実行してください**。
+alerts API には `security_events` の OAuth スコープが必要ですが、0.2.28 より前の login は
+このスコープを要求していませんでした。スコープが無いと、`sekimore security alerts` は GitHub から
+403 を受け取ります。
 
 ## 0.2.29 解錠を自動化できるようになった
 
-**使いたくなければ何も要りません。** `mise run gw:unlock` は変わらず、何も保存していない
-ホストの挙動もこれまでどおりです。
+**解錠を自動化しないなら、作業は不要です。** `mise run gw:unlock` は変わらず、パスフレーズを
+保存していないホストの動作もこれまでどおりです。
 
-`mise run gw:sync-tasks` で新しいタスクを取り出し、ホストごとに一度だけ:
+`mise run gw:sync-tasks` を実行して 2 つの新しいタスクを取り込み、各ホストで一度だけ次を実行します。
 
 ```bash
 mise run gw:keychain-set     # パスフレーズを尋ね、このホストの keychain に入れる
 ```
 
-以後は `mise run gw:recreate` が自分で解錠します。`docker restart` のあとなら
-`mise run gw:unlock-auto` 単体でも解錠できます。
+以後は、`mise run gw:recreate` が自動でストアを解錠します。`docker restart` のあとは、
+`mise run gw:unlock-auto` を実行すれば、パスフレーズを入力せずに解錠できます。
 
-探す順番は次のとおりです。`<project>` は `MISE_PROJECT_ROOT` の指すディレクトリ名なので、
-1 台のホストに 2 案件あっても別々の項目になります。
+タスクは、次の場所をこの順番で探します。`<project>` は `MISE_PROJECT_ROOT` が指すディレクトリの名前です。
+そのため、1 台のホストに 2 つのプロジェクトがあっても、別々の項目になります。
 
-| | 置き場 | 機械に縛るもの |
+| ホスト | 置き場所 | パスフレーズをこのマシンに結び付けるもの |
 |---|---|---|
-| macOS | Keychain。service `sekimore-gw`、account `<project>` | ログイン。ログインするまで開かない |
-| Linux デスクトップ | Secret Service (`secret-tool`)。`service=sekimore-gw project=<project>` | ログインセッション |
-| サーバ | `/etc/sekimore/<project>.passphrase.cred` を `systemd-creds decrypt` で読む | TPM かホスト鍵。ディスクを複製しても持ち出せない |
-| サーバ・最後の手段 | `/etc/sekimore/<project>.passphrase`（root 所有 0600） | **何も無い。** ファイルを読めた者がパスフレーズを持つ |
+| macOS | Keychain。service `sekimore-gw`、account `<project>` | あなたのログイン。ログインするまで Keychain は施錠されています。 |
+| Linux デスクトップ | Secret Service（`secret-tool`）。`service=sekimore-gw project=<project>` | あなたのログインセッション |
+| サーバー | `/etc/sekimore/<project>.passphrase.cred` を `systemd-creds decrypt` で読む | TPM またはホスト鍵。ディスクを複製しても、使えるパスフレーズは含まれません。 |
+| サーバー（最後の手段） | `/etc/sekimore/<project>.passphrase`。root 所有、モード 0600 | **何もありません。** ファイルを読める人は誰でもパスフレーズを得られます。 |
 
-keychain の無いホストでは `gw:keychain-set` がサーバ向け 2 通りの手順をそのまま表示します。
-`/etc/sekimore` 自体は 0755 のままにしてください。タスクはファイルが見えてから初めて
-`sudo -n` を使い、sudo のパスワードは決して尋ねません（`gw:recreate` が止まってしまうため）。
+どちらの keychain も無いホストでは、`gw:keychain-set` がサーバー向けの 2 つの方法の具体的なコマンドを
+表示します。`/etc/sekimore` 自体のモードは 0755 のままにしてください。タスクは、sudo を使わずに
+ファイルを見つけてから初めて `sudo -n` を使い、sudo のパスワードは決して尋ねません。
+`gw:recreate` がパスワードの入力待ちで止まってはならないためです。
 
-ここでいう `/etc/sekimore` は**ホスト側**のものです。ゲートウェイの中にも同名のディレクトリが
-あります（`config.yml` の置き場）が、ホスト側をそこに mount すると、この設計が
-ゲートウェイから遠ざけているはずのパスフレーズを渡してしまいます。
+ここでいう `/etc/sekimore` は**ホスト側**のものです。ゲートウェイのコンテナの中にも同じ名前のディレクトリが
+あります（`config.yml` がそこにあります）。ホスト側のディレクトリをゲートウェイに mount しないでください。
+mount すると、この設計がゲートウェイから遠ざけているパスフレーズをゲートウェイに渡すことになります。
 
-変わらないことが 2 つあります。
+この版で**変わらない**ことが 2 つあります。
 
-- **ゲートウェイは何も知りません。** パスフレーズはホストが読み、
-  `sekimore-relay unlock --stdin` に流し込みます。届く経路は今までどおり control socket で、
-  dev コンテナはそれを mount していませんし、ゲートウェイの中から取りに行く手段もありません。
-  export を守るのが相変わらずパスフレーズ 1 つだけである点も同じです。
-- **最初のパスフレーズは手で打ちます。** 未初期化のストアに対して `unlock --stdin` は拒否します。
-  最初の 1 つは思い出すものではなく決めるもので、確認のため 2 回尋ねるからです。
+- ゲートウェイが新たに知ることはありません。パスフレーズはホストが読み、`sekimore-relay unlock --stdin`
+  にパイプで渡します。パスフレーズは引き続き制御ソケット経由で届きます。dev コンテナは制御ソケットを
+  mount しておらず、ゲートウェイの中からパスフレーズを探す手段もありません。export を守るのが
+  パスフレーズだけである点も変わりません。
+- 最初のパスフレーズは引き続き手で入力します。`unlock --stdin` は、一度も初期化されていないストアを
+  拒否します。最初のパスフレーズは思い出すものではなく決めるものであり、プロンプトが確認のために
+  2 回尋ねるからです。
 
-解錠させたくないときは:
+作り直したあともゲートウェイを施錠したままにするには、1 台のホストでもすべてのホストでも、次を実行します。
 
 ```bash
 SGW_NO_AUTO_UNLOCK=1 mise run gw:recreate
 ```
 
-ファイルの置き場を `/etc/sekimore` 以外にするなら `SGW_PASSPHRASE_DIR` です。
+パスフレーズのファイルを `/etc/sekimore` 以外のディレクトリで探すには、`SGW_PASSPHRASE_DIR` を設定します。
 
 ## 0.2.29 署名鍵を人につき 1 本にする
 
-**任意です。何もしなければ今までどおり**、dev コンテナが自分で署名鍵を生成します。
+**この作業は任意で、実施しなくても何も変わりません。** `relay.signing_key` が無ければ、dev コンテナは
+これまでどおり自分で署名鍵を生成します。
 
-その鍵は使い捨てですが、署名鍵は使い捨てにできません。GitHub には人が手で登録し、
-消すとその鍵が署名した全てのコミットから Verified が外れます。つまり鍵の volume を
-消すと「作り直し」ではなく喪失で、以後のコミットは GitHub が知らない鍵で署名されます。
-そうと分かる手段もありませんでした。`commit.gpgsign` は無条件に true で、
-鍵が登録されているかを確かめる仕組みはどこにも無かったからです。
+生成される鍵は使い捨てですが、署名鍵は使い捨てにしてはなりません。署名鍵は手作業で GitHub に登録し、
+削除するとその鍵が署名したすべてのコミットから Verified バッジが外れます。鍵の volume が消えると、
+鍵は作り直されるのではなく失われ、以後のコミットはすべて GitHub が知らない鍵で署名されます。
+これを知らせる仕組みはありませんでした。`commit.gpgsign` は無条件に設定され、鍵が登録されているかを
+確認するものが無かったためです。
 
-置き換える手順 — 人につき 1 本、登録は一度だけ:
+置き換える手順（人につき 1 本、登録は一度だけ）は次のとおりです。
 
-1. 手元で鍵を作る（無ければ）。**自分自身の署名鍵とは別にします**。
-   分けておくことが、履歴の中で AI のコミットを見分けられる根拠になります。
+1. この用途の鍵がまだ無ければ、手元のマシンで作成します。**自分自身の署名鍵は使わないでください**。
+   別の鍵にしておくことで、履歴の中で AI のコミットを見分けられます。
 
    ```bash
    ssh-keygen -t ed25519 -C "sekimore AI signing key" -f ~/.ssh/sekimore_signing
-   ssh-add ~/.ssh/sekimore_signing          # Mac なら --apple-use-keychain
-   ssh-keygen -lf ~/.ssh/sekimore_signing.pub   # SHA256:… の fingerprint
+   ssh-add ~/.ssh/sekimore_signing          # Mac では --apple-use-keychain を付ける
+   ssh-keygen -lf ~/.ssh/sekimore_signing.pub   # SHA256:… の fingerprint を表示する
    ```
 
-2. **公開鍵**を GitHub に一度だけ登録する。Settings → SSH and GPG keys →
-   New SSH key → Key type: **Signing Key**。
+2. **公開鍵**を GitHub に一度だけ登録します。Settings → SSH and GPG keys →
+   New SSH key → Key type: **Signing Key** の順に操作します。
 
-3. fingerprint を `.devcontainer/config/config.yml` に書く:
+3. fingerprint を `.devcontainer/config/config.yml` に書きます。
 
    ```yaml
    relay:
@@ -329,12 +341,12 @@ SGW_NO_AUTO_UNLOCK=1 mise run gw:recreate
        fingerprint: "SHA256:…"     # 手順 1 のもの
    ```
 
-   自分の他の鍵は同じ agent に入れたままで構いません。relay が dev に渡すのは
-   この fingerprint 1 本だけに答え、git 署名以外を一切通さない**絞り込んだ**
-   socket です。他の鍵は見えず、この socket では認証もできません。
+   自分の他の鍵は同じ agent に入れたままで構いません。関所が dev コンテナに渡すのは、
+   この fingerprint にだけ応答し、git の署名以外には何も署名しない、**絞り込んだ** socket です。
+   他の鍵は見えず、この socket で認証することもできません。
 
-4. socket の volume を `.devcontainer/docker-compose.relay.yml` の**両方の**
-   サービスに足す（雛形には入っています）:
+4. `.devcontainer/docker-compose.relay.yml` の**両方の**サービスに socket の volume を追加します
+   （雛形には既に含まれています）。
 
    ```yaml
    services:
@@ -350,15 +362,16 @@ SGW_NO_AUTO_UNLOCK=1 mise run gw:recreate
        name: sekimore-signing-${DEVCONTAINER_ID}
    ```
 
-5. `mise run gw:recreate` のあと Rebuild Container。効いたか確認する:
+5. `mise run gw:recreate` を実行し、続けて Rebuild Container を実行します。鍵が使われていることを
+   確認します。
 
    ```bash
-   mise run gw:check     # 「署名鍵: ホストの agent にある」
+   mise run gw:check     # 「署名鍵: ホストの agent にある (…)」と表示される
    ```
 
-   dev の中では `ssh-add -l` が**ちょうど 1 本**を出すようになります（絞り込んだ
-   socket 越しの署名鍵）。`mise.toml` の `relay:verify` が「`ssh-add -l` が成功したら
-   FAIL」のままなら、その部分を差し替えてください:
+   dev コンテナの中では、`ssh-add -l` が**ちょうど 1 本**の鍵を表示するようになります。絞り込んだ
+   socket 越しの署名鍵です。`mise.toml` に、`ssh-add -l` が成功すると失敗する 0.1.x の
+   `relay:verify` タスクがある場合は、そのブロックを次の内容に置き換えてください。
 
    ```bash
    echo "== dev: only the gateway's filtered signing key may be reachable"
@@ -373,71 +386,71 @@ SGW_NO_AUTO_UNLOCK=1 mise run gw:recreate
    fi
    ```
 
-古い `~/.ssh/sekimore/signing_ed25519` は消しません。履歴に残っているコミットを
-署名した鍵であり、それらの Verified を保つには公開鍵を GitHub に登録したままに
-しておく必要があります。
+古い `~/.ssh/sekimore/signing_ed25519` は削除されません。この鍵は履歴に残っているコミットに署名しており、
+それらのコミットの Verified バッジを保つには、公開鍵を GitHub に登録したままにしておく必要があります。
 
-**`signing: required`** は別の話で、これも任意です。branch への push に署名の無い
-コミットが含まれていたら関所が拒否します。今回の件を 20 コミット早く見つけられた
-はずの検査です。既定は `optional` なので、既存の案件の挙動は変わりません。
+**`signing: required`** はこれとは別の、任意の設定です。有効にすると、push に含まれるコミットに
+署名の無いものが 1 つでもあれば、関所は branch への push を拒否します。この検査があれば、
+未登録の鍵の問題を 20 コミット早く見つけられたはずです。既定値は `optional` なので、
+既存のプロジェクトの動作は変わりません。
 
 ```yaml
 relay:
   project:
-    signing: required     # 上流層や repos[] でも指定できる
+    signing: required     # 上流ごと、repos[] ごとにも指定できる
 ```
 
-有効にするのは手順 5 が通ってからにしてください。鍵が無い状態で有効にすると、
-全ての push が拒否されます。
+有効にするのは、手順 5 が成功してからにしてください。鍵が無い状態で有効にすると、関所はすべての push を
+拒否します。
 
-`required` は**上流 API も使います**。push の履歴が pack から出た地点で、そのコミットを
-上流が既に持っているかを問い合わせるためです（そうしないと、delta に隠れたコミットと
-上流の履歴が pack の中から区別できません）。解錠（`mise run gw:unlock`）と login が
-できていないと push は拒否されます。拒否のメッセージがどちらかを言います。
+`required` は**上流 API も必要とします**。push された履歴が pack の外に出る地点で、関所はそのコミットを
+上流が既に持っているかを問い合わせます。この問い合わせが無いと、delta の後ろに隠れたコミットを
+pack の中から区別できません。そのためゲートウェイが解錠され（`mise run gw:unlock`）、login 済みである
+必要があります。そうでない場合、push は安全側に倒れて失敗し、どの条件が欠けているかをメッセージが示します。
 
 ## base 0.2.19 `mise run web` が自分でポートを引く
 
-**base 0.2.20 に上げるなら飛ばしてください** — [その節](#base-0220-devcontainersgw-と-mise-run-upgrade)で
-両方のファイルがまるごと入れ替わります。
+**base 0.2.20 に上げる場合は、この節を飛ばしてください。**
+[base 0.2.20 の節](#base-0220-devcontainersgw-と-mise-run-upgrade)の作業で、両方のファイルが
+まるごと入れ替わります。
 
-**任意。** 飛ばしても壊れません。壊れるのは Web UI の公開ポートをずらしたときで、
-古い `web` task はそこで違う場所を開きます。
+**この作業は任意です。** 飛ばしても、Web UI の公開ポートを変えるまでは何も壊れません。
+公開ポートを変えると、古い `web` タスクは誤った場所を開きます。
 
-task にポートが直書きされていた一方、実際に決めているのは compose です。8090 が
-既に埋まっているプロジェクトは公開ポートをずらしますが、task は古い数字を開き続け、
-`mise run web` は何も無い場所に行き着きます。他のプロジェクトの gateway に当たると、
-そちらのほうが厄介です。
+古いタスクにはポートがリテラルで書かれていましたが、実際のポートを決めるのは compose ファイルです。
+8090 番ポートが既に使われているプロジェクトは公開ポートを変えますが、タスクは古い番号を開き続けます。
+その結果、`mise run web` は何も無い場所に行き着くか、より悪い場合は別のプロジェクトのゲートウェイに
+つながります。
 
-これは gateway の版に紐づきません。サンプル自身のファイルの話で、gateway は変わって
-いません。
+この変更はゲートウェイの版には結び付いていません。雛形自身のファイルだけに関わる変更で、ゲートウェイは
+変わっていません。
 
-サンプルから両方を取ってください。`sgw.sh` に `port` の枝が増え、`mise.toml` の
-`web` task がそれを呼びます。
+両方のファイルを雛形から取り込んでください。`sgw.sh` に `port` 分岐が追加され、`mise.toml` の
+`web` タスクがそれを呼びます。
 
 ```bash
 diff -u <base>/examples/sgw-sample/.devcontainer/scripts/sgw.sh .devcontainer/scripts/sgw.sh
 diff -u <base>/examples/sgw-sample/mise.toml mise.toml
 ```
 
-以後 `mise run web` は開く URL を表示します。ポートが違っていれば黙って外れるのでは
-なく、目に見えます。
+以後、`mise run web` は開く URL を表示するので、ポートが誤っていれば黙って失敗せずに目に見えます。
 
 ## base 0.2.20 `.devcontainer/sgw/` と `mise run upgrade`
 
-**一度だけ手で移します。以後の更新は `mise run upgrade:apply` です。**
+**一度だけ手作業で移行します。以後の更新は `mise run upgrade:apply` を実行するだけです。**
 
 ホスト側のスクリプトとタスクは `.devcontainer/sgw/` に移り、あなたのものではなくなります。
-`mise run upgrade:apply` がまるごと入れ替え、中のファイルが手で書き換えられていれば、
-上書きせずに止まります。`mise.toml` には include と自分のタスクだけが残ります。
+`mise run upgrade:apply` はこのディレクトリをまるごと入れ替えます。中のファイルが手で編集されていれば、
+上書きせずに止まります。`mise.toml` には include とあなた自身のタスクだけが残ります。
 
-1. `FROM` が `latest` なら、base を版で固定します。`upgrade` は 2 つのタグを読むので、
-   `latest` は上げられません:
+1. `FROM` が `latest` を使っている場合は、base イメージを版で固定します。`upgrade` は base と
+   ゲートウェイのイメージタグを読むため、`latest` タグは更新できません。
 
    ```dockerfile
    FROM ghcr.io/amakata/sgw-devcontainer-base:0.2.20
    ```
 
-2. `upgrade.sh` を置き、残りを埋めさせます:
+2. `upgrade.sh` をダウンロードし、実行して残りのファイルを追加します。
 
    ```bash
    mkdir -p .devcontainer/sgw
@@ -446,13 +459,13 @@ diff -u <base>/examples/sgw-sample/mise.toml mise.toml
    bash .devcontainer/sgw/upgrade.sh --sync
    ```
 
-   `mise.toml` に何を書くか、どの古いファイルが使われなくなったかを表示します。
+   スクリプトは、`mise.toml` に書くべき include と、使われなくなった古いファイルを表示します。
 
-3. `mise.toml` をあなただけのものにします。**配布されるようになったタスクは消してください** —
-   `vscode`、`vscode:check`、`vscode:restore-agent-env`、`web`、`ps`、`down`、`dev:*`、
-   `relay:verify`、`gw:sync-tasks`。`mise.toml` に残したタスクは同じ名前の配布タスクより
-   優先されるので、古い複製が残っていると、そのタスクへの以後の修正がすべて隠れます。
-   自分のタスクは残します:
+3. `mise.toml` から、あなた自身のタスク以外をすべて削除します。**配布されるようになったタスクを
+   削除してください**。対象は `vscode`、`vscode:check`、`vscode:restore-agent-env`、`web`、`ps`、
+   `down`、`dev:*`、`relay:verify`、`gw:sync-tasks` です。`mise.toml` にあるタスクは同じ名前の
+   配布タスクより優先されるので、古い複製が残っていると、そのタスクへの以後の修正がすべて隠れます。
+   あなた自身のタスクは残し、次を追加します。
 
    ```toml
    [task_config]
@@ -462,64 +475,68 @@ diff -u <base>/examples/sgw-sample/mise.toml mise.toml
    SGW = "{{config_root}}/.devcontainer/sgw/sgw.sh"
    ```
 
-4. 古い配置を消します:
+4. 古い配置を削除します。
 
    ```bash
    git rm .devcontainer/scripts/sgw.sh .devcontainer/scripts/vscode.sh .devcontainer/gateway.mise.toml
    ```
 
-5. `mise run upgrade` が版を並べ、すべて最新と表示すれば完了です。
+5. `mise run upgrade` を実行します。版が一覧表示され、すべて最新であると表示されれば完了です。
 
-`gw:sync-tasks` は無くなりました。`mise run upgrade:sync` が gateway のタスクも含めて取り直します。
-タスクの説明とスクリプトの表示は `LC_ALL` / `LC_MESSAGES` / `LANG` に従います。固定するなら
-`[env]` に `SEKIMORE_LANG = "ja"` (または `"en"`) を書き、`mise run upgrade:sync` を実行します。
+`gw:sync-tasks` は廃止されました。`mise run upgrade:sync` が、ゲートウェイのタスクを他の配布ファイルと
+一緒に取得します。タスクの説明とスクリプトの出力は `LC_ALL` / `LC_MESSAGES` / `LANG` に従います。
+言語を固定するには、`[env]` に `SEKIMORE_LANG = "ja"`（または `"en"`）を書き、
+`mise run upgrade:sync` を実行します。
 
 ## base 0.2.22 `postStartCommand` が `.devcontainer/sgw/post-start.sh` を実行する
 
-**`devcontainer.json` を 1 行、一度だけ書き換えます。** 済むまで `mise run upgrade` が案内します。
+**`devcontainer.json` の 1 行を一度だけ書き換えます。** 完了するまで、`mise run upgrade` がこの作業を
+表示します。
 
 ```json
 "postStartCommand": "sh /workspace/.devcontainer/sgw/post-start.sh",
 ```
 
-`agent-setup` は `sudo` で動くので環境がリセットされ、`.env` の変数は `--preserve-env=` に
-書いたものしか届きませんでした。一覧から漏れた変数は、設定しても黙って無視されます。その一覧は
-あなたのファイルであるここにあり、agent-setup が変数を増やすたびに遅れていました
-(`SEKIMORE_GUIDE_LANG`)。`post-start.sh` はコンテナにある `SEKIMORE_*` 変数をすべて渡し、
-続けて `docker-init.sh` とあなたの `.devcontainer/scripts/post-create.sh` を実行します。
-以前の 1 行がしていたことと同じです。そこで他に実行していたものは `post-create.sh` に移してください。
+`agent-setup` は `sudo` の下で動き、`sudo` は環境変数をリセットします。そのため `.env` の変数は、
+`--preserve-env=` に名前が書かれている場合にだけ届き、一覧から漏れた変数は、設定されていても黙って
+無視されていました。この一覧はあなたが持つ `devcontainer.json` にあり、agent-setup が新しい入力を
+得るたびに（たとえば `SEKIMORE_GUIDE_LANG`）更新が遅れていました。`post-start.sh` はコンテナにある
+`SEKIMORE_*` 変数をすべて渡し、続けて `docker-init.sh` とあなたの
+`.devcontainer/scripts/post-create.sh` を実行します。これは以前の 1 行と同じ処理です。
+`postStartCommand` で他に実行していたコマンドは、`post-create.sh` に移してください。
 
-`.env` にある「`--preserve-env=` に足すこと」というコメントも不要になります。
+`.env` にある「`--preserve-env=` に変数を追加すること」という趣旨のコメントも削除して構いません。
 
 ## base 0.2.26 credential helper の除去は `post-start.sh` が行う
 
-**必須 (`post-create.sh` にある場合): 消すまで毎回、起動に失敗します。**
+**`post-create.sh` に `disable_vscode_credential_helper` がある場合は、この作業が必須です。
+削除するまで、コンテナは毎回起動に失敗します。**
 
-`.devcontainer/sgw/post-start.sh` が、VS Code 拡張が `/etc/gitconfig` と `~/.gitconfig` に書く
-HTTPS の credential helper を、起動のたびに、あなたの `post-create.sh` より先に取り除きます。
-`SEKIMORE_ALLOW_CREDENTIAL_HELPER=1` で残せるのは今までどおりです。
+`.devcontainer/sgw/post-start.sh` は、VS Code 拡張が `/etc/gitconfig` と `~/.gitconfig` に書き込む
+HTTPS の credential helper を、起動のたびに、あなたの `post-create.sh` より先に取り除くようになりました。
+`SEKIMORE_ALLOW_CREDENTIAL_HELPER=1` を設定すれば、これまでどおり helper を残せます。
 
-古いサンプルから始めたプロジェクトは、自分の `.devcontainer/scripts/post-create.sh` に
-`disable_vscode_credential_helper` を持っています。関数と、それを呼ぶ箇所を消してください。
-base 0.2.29 からは `post-start.sh` が起動のたびに警告しますが、消すまで起動は失敗したままです。
-残しておくと重複するだけでは済みません。最後が `[ "$changed" = 1 ] && echo …` なので、
-取り除くものが無いと 1 を返し、`set -e` の下で post-create.sh が止まり、コンテナの起動も
-失敗します。サンプルの写しは `/etc/gitconfig` を sudo 無しで書き換えていたので、system 側の
-helper も取り除けていませんでした。
+古い雛形から作ったプロジェクトは、自分の `.devcontainer/scripts/post-create.sh` に
+`disable_vscode_credential_helper` を持っています。この関数と、それを呼ぶ箇所を削除してください。
+base 0.2.29 からは `post-start.sh` が起動のたびに警告を表示しますが、複製を削除するまで起動は失敗し続けます。
+この複製は単に重複しているだけではありません。最後が `[ "$changed" = 1 ] && echo …` なので、取り除く
+ものが無いと 1 を返します。`set -e` の下ではこの戻り値で `post-create.sh` が止まり、コンテナの起動も
+止まります。さらに、雛形の複製は `/etc/gitconfig` を sudo 無しで書き換えていたため、システム側の
+helper を一度も取り除けていませんでした。
 
 ## base 0.2.28 `gh` が無くなった
 
-**自分が動かすものが `gh` を呼んでいる場合だけ。**
+**この節は、あなたが実行するものが `gh` を呼んでいる場合だけが対象です。**
 
-GitHub CLI をイメージから外した。`api.github.com` へは関所の 443 passthrough を通っていた
-— 中身を読まずに中継する経路なので、トークンを持った `gh` は関所が課す操作ごとの権限を
-どれも受けずに GitHub を操作できた。`config.yml` で `pr:merge` を拒否しても
-`gh pr merge` は止まらず、案件外のリポジトリにも届いた。
+GitHub CLI はイメージから削除されました。`gh` は、関所の 443 passthrough を通って `api.github.com`
+に届いていました。この経路はリクエストを読まずに転送するため、トークンを持つ `gh` は、関所が課す
+操作ごとの権限をまったく受けずに GitHub を操作できました。たとえば `config.yml` で `pr:merge` を
+拒否しても `gh pr merge` は止まらず、プロジェクト外のリポジトリも操作できました。
 
-同じことは `sekimore` がエージェント API 経由でできる。そちらは操作ごとに案件の設定と
-照合され、記録も残る。
+`sekimore` は同じ操作をエージェント API 経由で行います。そこでは関所が各操作をプロジェクトの設定と
+照合し、記録します。
 
-| これの代わりに | これを使う |
+| 代わりに | 使うもの |
 |---|---|
 | `gh pr create` | `sekimore pr create --head <branch> --base <base> --title T --body="…"` |
 | `gh pr merge` | `sekimore pr merge --number N` |
@@ -528,5 +545,6 @@ GitHub CLI をイメージから外した。`api.github.com` へは関所の 443
 | `gh run view` / `gh run view --log` | `sekimore ci jobs --number N` / `sekimore ci log --number N` |
 | `gh release create` | `sekimore release create --tag vX.Y.Z` |
 
-残りは `sekimore guide` にある。自分のスクリプトがどうしても `gh` を要るなら、そこで
-入れることになるが、その操作は関所から見えず、止めることもできない。
+その他のコマンドは `sekimore guide` に一覧があります。自分のスクリプトが `gh` を必要とする場合は、
+そのスクリプトを実行する環境に `gh` をインストールしてください。ただし、`gh` が行う操作は関所から
+見えず、拒否することもできません。
