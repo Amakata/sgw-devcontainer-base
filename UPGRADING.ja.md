@@ -493,7 +493,7 @@ diff -u <base>/examples/sgw-sample/mise.toml mise.toml
 
 ## base 0.2.26 credential helper の除去は `post-start.sh` が行う
 
-**任意: あなたの `post-create.sh` にあれば、消す行があります。**
+**必須 (`post-create.sh` にある場合): 消すまで毎回、起動に失敗します。**
 
 `.devcontainer/sgw/post-start.sh` が、VS Code 拡張が `/etc/gitconfig` と `~/.gitconfig` に書く
 HTTPS の credential helper を、起動のたびに、あなたの `post-create.sh` より先に取り除きます。
@@ -501,6 +501,7 @@ HTTPS の credential helper を、起動のたびに、あなたの `post-create
 
 古いサンプルから始めたプロジェクトは、自分の `.devcontainer/scripts/post-create.sh` に
 `disable_vscode_credential_helper` を持っています。関数と、それを呼ぶ箇所を消してください。
+base 0.2.29 からは `post-start.sh` が起動のたびに警告しますが、消すまで起動は失敗したままです。
 残しておくと重複するだけでは済みません。最後が `[ "$changed" = 1 ] && echo …` なので、
 取り除くものが無いと 1 を返し、`set -e` の下で post-create.sh が止まり、コンテナの起動も
 失敗します。サンプルの写しは `/etc/gitconfig` を sudo 無しで書き換えていたので、system 側の

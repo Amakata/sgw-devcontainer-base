@@ -515,14 +515,15 @@ A comment in `.env` that tells you to add a variable to `--preserve-env=` can go
 
 ## base 0.2.26 the credential helper is `post-start.sh`'s
 
-**Optional: a line to delete, if your `post-create.sh` has it.**
+**Required if your `post-create.sh` has it: the start fails every time until it is gone.**
 
 `.devcontainer/sgw/post-start.sh` now takes out the HTTPS credential helper the VS Code
 extension writes into `/etc/gitconfig` and `~/.gitconfig`, on every start, before your
 `post-create.sh` runs. `SEKIMORE_ALLOW_CREDENTIAL_HELPER=1` still keeps it.
 
 A project started from an older sample carries `disable_vscode_credential_helper` in its own
-`.devcontainer/scripts/post-create.sh`. Delete the function and its call. Leaving it is
+`.devcontainer/scripts/post-create.sh`. Delete the function and its call. From base 0.2.29
+`post-start.sh` says so on every start, but the start still fails until the copy is gone. Leaving it is
 worse than redundant: it ends in `[ "$changed" = 1 ] && echo …`, which returns 1 when there
 was nothing to remove, and under `set -e` that stops post-create.sh — and with it the
 container's start. The sample's copy also changed `/etc/gitconfig` without sudo, so it never

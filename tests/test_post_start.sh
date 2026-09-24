@@ -46,7 +46,7 @@ run() {
   RC=0
   env -i PATH="$TMP/bin:$PATH" LOG="$TMP/log" HOME="$TMP/home" GIT_CONFIG_SYSTEM="$TMP/etc-gitconfig" SGW_AGENT_SETUP="$TMP/agent-setup" \
     SGW_DOCKER_INIT="$TMP/docker-init" SGW_POST_CREATE="${POST_CREATE-$TMP/post-create.sh}" \
-    "$@" sh "$SCRIPT" >/dev/null 2>&1 || RC=$?
+    "$@" sh "$SCRIPT" >/dev/null 2>"$TMP/log/err" || RC=$?
 }
 
 echo "== every SEKIMORE_* variable reaches agent-setup, and nothing that only looks like one"
@@ -99,5 +99,24 @@ echo "== SEKIMORE_ALLOW_CREDENTIAL_HELPER=1 keeps it"
 reset_git; sysgit --global credential.helper "$VS"
 run SEKIMORE_ALLOW_CREDENTIAL_HELPER=1
 [ "$(sysgit --global --get-all credential.helper)" = "$VS" ] || fail "the escape hatch did not keep the helper"
+
+# #64: 0.2.26 moved this out of each project's post-create.sh, and a copy left behind there stops
+# the start — its last statement is false once the helper is already gone, and `set -e` does the
+# rest. The project saw no reason why, so the warning has to arrive before post-create.sh runs.
+echo "== a stale copy in post-create.sh is called out, and the start still goes on"
+reset_git
+printf 'disable_vscode_credential_helper() { :; }\necho post-create >> "$LOG/order"\n' > "$TMP/stale-post-create.sh"
+POST_CREATE="$TMP/stale-post-create.sh" run SEKIMORE_PROJECT=p
+[ "$RC" = 0 ] || fail "a stale copy must warn, not stop the start (exited $RC)"
+grep -q 'disable_vscode_credential_helper' "$TMP/log/err" || { cat "$TMP/log/err"; fail "no warning about the stale copy"; }
+grep -q '0.2.26' "$TMP/log/err" || fail "the warning does not say which release made it unnecessary"
+grep -qx 'post-create' "$TMP/log/order" || fail "post-create.sh did not run after the warning"
+
+echo "== a post-create.sh without the copy says nothing"
+reset_git
+run SEKIMORE_PROJECT=p
+if grep -q 'disable_vscode_credential_helper' "$TMP/log/err" 2>/dev/null; then
+  fail "warned about a stale copy that is not there"
+fi
 
 echo "PASS: post-start.sh"
