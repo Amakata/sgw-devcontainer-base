@@ -1,4 +1,4 @@
-<!-- reviewed-up-to: 0.2.33 -->
+<!-- reviewed-up-to: 0.2.34 -->
 # Upgrading (what each release asks of you)
 
 *[日本語版](UPGRADING.ja.md)*

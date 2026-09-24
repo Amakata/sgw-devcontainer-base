@@ -14,6 +14,12 @@ DevContainer のベースイメージ — Dockerfile と焼き込む道具、同
 0.2.18 から始める。それ以前のリリースはここに書かない。各 PR とタグが記録。
 取り込んだ gateway の版だけは末尾にある。
 
+## 0.2.32（2026-09-24）
+
+### Enhancement
+
+- sekimore-gw 0.2.34 を取り込む。このイメージの CLI とガイドが `pr comment-edit` / `comment-delete` と `issue` 側の同じコマンドを知るようになる (#174)
+
 ## 0.2.31（2026-09-24）
 
 ### Enhancement
