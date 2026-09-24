@@ -17,6 +17,12 @@ Starts at 0.2.18. Releases before it are not written up here; the pull requests
 and the tag on each are the record. The gateway each of them took is at the
 bottom.
 
+## 0.2.33 (2026-09-24)
+
+### Enhancement
+
+- takes sekimore-gw 0.2.35, so the CLI and the agent guide in this image know `pr files` and `pr diff`, which read a pull request's diff under `pr:read` (#173)
+
 ## 0.2.32 (2026-09-24)
 
 ### Enhancement
