@@ -36,7 +36,14 @@ USER vscode
 # ---------------------------------------------------------------------------
 # Install specific language versions via mise (pre-installed in base image).
 #
-# Adjust versions to taste, or remove blocks you don't need.
+# Adjust versions to taste, or remove blocks you don't need. After adding a
+# version with `mise use -g`, run `mise reshim` to regenerate the shims.
+#
+# The base image puts ~/.local/share/mise/shims first in ENV PATH, so the
+# languages resolve from non-interactive processes too (Claude Code tool
+# calls, `docker exec`, postCreateCommand). Debian's /etc/profile resets PATH
+# for login shells, and a script in /etc/profile.d in the base image adds the
+# shims directory back.
 # ---------------------------------------------------------------------------
 ARG PYTHON_VERSION=3.13.0
 ARG NODE_VERSION=22.11.0
@@ -62,6 +69,13 @@ RUN mise use -g "python@${PYTHON_VERSION}" \
 # ---------------------------------------------------------------------------
 # Stage the populated mise installs so the sample's mise-store volume
 # can be bootstrapped on first start (see scripts/post-create.sh).
+#
+# docker-compose.yml mounts the mise-store volume over
+# ~/.local/share/mise/installs, which hides what this image installed there.
+# On the first start the volume is empty, and post-create.sh restores the
+# copy made here:
+#   rsync -a --ignore-existing ~/.local/share/mise/installs-default/ ~/.local/share/mise/installs/
+#   mise reshim
 # ---------------------------------------------------------------------------
 RUN cp -a ~/.local/share/mise/installs ~/.local/share/mise/installs-default
 

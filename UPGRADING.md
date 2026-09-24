@@ -47,10 +47,37 @@ Independently of the gateway version, a project created before base 0.2.20 must 
 does not start, and the gateway behaves as in 0.0.x: DNS filtering, the firewall and Squid
 are unchanged. No configuration key was removed or renamed. `allow_domains`,
 `block_domains`, `allow_ips`, `block_ips`, `proxy`, `network` and `database_path` are all
-still parsed.
+still parsed. To move to a newer version without the relay, raise the image tag and run
+`mise run gw:recreate`.
 
-To adopt the relay, see the README's
-[0.0.8 section](README.md#008-以前の-gateway-から上げる場合).
+To adopt the relay, see [Adopting the relay from 0.0.x](#adopting-the-relay-from-00x).
+
+### Adopting the relay from 0.0.x
+
+The relay requires components that a 0.0.x setup does not have. The relay's part of the setup
+is in a separate overlay compose file, so three additions are needed:
+
+1. `domain_handlers` and `relay` in `config.yml`
+   (the end of [`config/config.sample.yml`](https://github.com/Amakata/sekimore-gw/blob/main/config/config.sample.yml)
+   is the current template)
+2. A copy of [`docker-compose.relay.yml`](examples/sgw-sample/.devcontainer/docker-compose.relay.yml),
+   listed in `dockerComposeFile` in `devcontainer.json` **after** `docker-compose.yml`.
+   This file contains the ssh-agent mount and the disposable-key volume
+3. `.env.sample` copied to `.env`, with the project name and the other values filled in (the
+   overlay reads it)
+
+Then run `mise run gw:unlock`, `gw:login`, `dev:signing-key` and `relay:verify`, in that order.
+
+To stop using the relay, remove the overlay from `dockerComposeFile` and delete `domain_handlers`
+and `relay` from `config.yml`. The gateway then behaves as 0.0.x did.
+
+With all of these additions, the `.devcontainer/` differs substantially from a 0.0.x setup, so
+**it is faster to copy the template again and carry over `allow_domains` and the other
+settings.**
+
+The breaking changes in the later sections of this guide (0.1.9, 0.2.7 and others) affect only
+setups that have used the relay since 0.1.x. A move from 0.0.x configures the relay from
+scratch with the current template, so none of them applies.
 
 ## 0.1.9 permissions moved
 
