@@ -193,7 +193,7 @@ relay:
     #     repos:                # written without the host prefix; this upstream is implied
     #       - { name: Corp/Internal, mode: read-write, bases: [main] }
     #
-    # Permissions. `resource:action`; anything not listed is denied. All 28 keys are here, so a
+    # Permissions. `resource:action`; anything not listed is denied. All 33 keys are here, so a
     # project turns one on by uncommenting it. `{allow: [...], deny: [...]}` also works.
     # The commented ones are the consequential ones - each says what you are letting go of.
     permissions:
@@ -207,6 +207,8 @@ relay:
       # - pr:close            # close a PR, and reopen one
       # - pr:label            # gw 0.2.15+ labels on a PR (GitHub serves PRs from the issues endpoints)
       # - pr:assign           # gw 0.2.15+ assignees on a PR
+      # - pr:comment_update   # gw 0.2.34+ edit a comment the agent posted. Only the agent's own; a person's is refused
+      # - pr:comment_delete   # gw 0.2.34+ delete a comment the agent posted. Commenting is not the authority to erase
       # issues
       - issue:create          # file an issue
       - issue:read            # read issues and their comments
@@ -215,10 +217,14 @@ relay:
       - issue:update          # gw 0.2.15+ edit an issue's title or body
       # - issue:close         # close an issue, and reopen one. Closing is a statement about the work
       # - issue:assign        # add and remove assignees. It puts work on a named person
+      # - issue:comment_update  # gw 0.2.34+ edit a comment the agent posted. Only the agent's own; a person's is refused
+      # - issue:comment_delete  # gw 0.2.34+ delete a comment the agent posted. Commenting is not the authority to erase
       # CI
       - ci:read               # workflow runs for a ref, which job failed, and its log
       # - ci:rerun            # re-run and cancel runs. It spends Actions minutes and runs workflow code
       #                       #   with the repository's secrets, which is why it is not part of ci:read
+      # - ci:dispatch         # gw 0.2.33+ start a workflow_dispatch run. Unlike ci:rerun, it can start a workflow
+      #                       #   that has never run here, e.g. a deploy
       # the repository, and search
       - repo:read             # the labels, assignable people and milestones this repository defines
       - search:read           # search across every repository of the project
