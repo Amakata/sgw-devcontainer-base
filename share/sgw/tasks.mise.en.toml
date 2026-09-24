@@ -176,5 +176,30 @@ else
   echo "❌ FAIL: no 'not in project' denial"; fail=1
 fi
 echo
+echo "== dev: a root process must not route past the gateway (host-side FORWARD rules, gateway 0.2.37)"
+# The bridge's .1 is Docker's own router. Without the gateway's rules in the host's DOCKER-USER
+# chain, a host route through it reaches the internet by Docker's NAT, around every filter.
+# The address is read from the JSON: mise would take a Go template's braces for its own.
+bridge_gw=$(docker network inspect "$(bash "$SGW" project 2>/dev/null)_internal-net" 2>/dev/null |
+  sed -n 's/.*"Gateway": *"\([0-9.]*\)".*/\1/p' | head -1)
+if [ -z "$bridge_gw" ]; then
+  echo "❌ FAIL: could not find the internal bridge's gateway address"; fail=1
+else
+  # one shell in dev, so the route goes away with it whatever curl does
+  bypass=$(bash "$SGW" dev sh -c '
+    sudo ip route replace 1.1.1.1/32 via "$1" 2>/dev/null || { echo noroute; exit 0; }
+    trap "sudo ip route del 1.1.1.1/32 2>/dev/null" EXIT
+    if curl --noproxy "*" -m 5 -sS -o /dev/null http://1.1.1.1/ 2>/dev/null; then echo reached; else echo blocked; fi' sh "$bridge_gw" 2>/dev/null || echo "dev unavailable")
+  case "$bypass" in
+    blocked) echo "OK: blocked (a host route via $bridge_gw leads nowhere)" ;;
+    reached)
+      echo "❌ FAIL: dev reached 1.1.1.1 via $bridge_gw, around the gateway. Add pid: host to the sekimore-gw service, then run: mise run gw:recreate"
+      fail=1
+      ;;
+    noroute) echo "❌ FAIL: could not add the test route in dev (sudo ip route)"; fail=1 ;;
+    *) echo "❌ FAIL: $bypass"; fail=1 ;;
+  esac
+fi
+echo
 [ "$fail" -eq 0 ] && echo "relay:verify: all checks passed" || { echo "relay:verify: FAILED"; exit 1; }
 '''

@@ -1,4 +1,4 @@
-<!-- reviewed-up-to: 0.2.36 -->
+<!-- reviewed-up-to: 0.2.37 -->
 # Upgrading: the changes each release requires
 
 *[日本語版](UPGRADING.ja.md)*
@@ -33,6 +33,7 @@ changed in each release, see the changelogs:
 | 0.2.22 – 0.2.26 | [0.2.27](#0227-tags-have-to-be-signed), **only if the agent pushes tags** |
 | 0.2.27 | [0.2.28](#0228-dependabot-alerts-are-optional), **only if you want the agent to read Dependabot alerts** |
 | 0.2.28 | [0.2.29](#0229-unattended-unlock-is-available), **only if you want unattended unlock or want AI commits to remain Verified** |
+| 0.2.29 – 0.2.36 | [0.2.37](#0237-the-gateway-needs-pid-host), **everyone** |
 
 Independently of the gateway version, a project created before base 0.2.20 must move to
 `.devcontainer/sgw/` once, by hand. See
@@ -454,6 +455,43 @@ the pack, the relay asks the upstream whether it already has that commit. Withou
 query, a commit hidden behind a delta cannot be distinguished from inside the pack. The
 gateway must therefore be unlocked (`mise run gw:unlock`) and logged in. Otherwise, pushes
 fail closed, and the message states which condition is missing.
+
+## 0.2.37 the gateway needs pid: host
+
+**Every project must act.** Until now, the agent was confined only inside the containers. A
+root process in dev could run `ip route replace default via <bridge .1>` and leave through
+Docker's own NAT, around every filter the gateway runs. From 0.2.37, the gateway adds two
+FORWARD rules to the host's `DOCKER-USER` chain: traffic from the internal bridge may stay
+on that bridge, where the gateway is, and anything leaving it is dropped. The gateway
+enters the host's namespaces with `nsenter` to add them, so it needs the host's PID
+namespace.
+
+Add `pid: host` to the `sekimore-gw` service in `.devcontainer/docker-compose.yml` (the
+sample already contains it). Do not add it to `dev`.
+
+```yaml
+services:
+  sekimore-gw:
+    privileged: true
+    pid: host                 # the FORWARD rules that confine dev live in the host's DOCKER-USER chain
+```
+
+Then run `mise run gw:recreate`. Without `pid: host` the gateway still starts, but the agent
+is **not** confined.
+
+To confirm that the rules are in place, read the gateway's log:
+
+```bash
+docker logs "$(bash .devcontainer/sgw/sgw.sh id sekimore-gw)" 2>&1 | grep 'FORWARD enforcement'
+```
+
+It prints "Host-side FORWARD enforcement in place". Without `pid: host`, it prints
+"Host-side FORWARD enforcement is not in place" and the reason.
+
+`mise run relay:verify` also checks the bypass itself: from dev, it adds a host route
+through the bridge's own router and expects the connection to fail.
+
+0.2.30 – 0.2.36 require no action.
 
 ## base 0.2.19 `mise run web` finds the port itself
 

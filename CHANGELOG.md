@@ -17,6 +17,14 @@ Starts at 0.2.18. Releases before it are not written up here; the pull requests
 and the tag on each are the record. The gateway each of them took is at the
 bottom.
 
+## 0.2.35 (2026-09-25)
+
+### Security
+
+- takes sekimore-gw 0.2.37, which confines the agent on the host: FORWARD rules in the host's `DOCKER-USER` chain let the internal bridge reach only the gateway, so a root process in dev can no longer route past it through Docker's NAT (#189)
+- the sample's gateway service runs with `pid: host`, which those rules need. A project must add it to its own `.devcontainer/docker-compose.yml`; see [UPGRADING](UPGRADING.md#0237-the-gateway-needs-pid-host)
+- `relay:verify` checks the bypass: a host route from dev through the bridge's own router must not reach the internet
+
 ## 0.2.34 (2026-09-24)
 
 ### Security
