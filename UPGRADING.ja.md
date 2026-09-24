@@ -46,10 +46,33 @@ changelog を参照してください。
 **関所は opt-in です。** `config.yml` に `domain_handlers` と `relay` が無ければ関所は起動せず、
 ゲートウェイは 0.0.x と同じように動きます。DNS フィルタ、ファイアウォール、Squid は変わりません。
 設定キーの削除や改名はありません。`allow_domains`、`block_domains`、`allow_ips`、`block_ips`、
-`proxy`、`network`、`database_path` は、いずれも引き続き解釈されます。
+`proxy`、`network`、`database_path` は、いずれも引き続き解釈されます。関所を使わずに新しい版に上げるだけなら、イメージのタグを上げて
+`mise run gw:recreate` を実行します。
 
-関所を導入する場合は、README の
-[「0.0.8 以前の gateway から上げる場合」](README.md#008-以前の-gateway-から上げる場合)を参照してください。
+関所を導入する場合は、[0.0.x から関所を導入する](#00x-から関所を導入する)を参照してください。
+
+### 0.0.x から関所を導入する
+
+関所を使うには、0.0.x の構成にないものが必要になります。関所側の構成は独立した overlay compose
+ファイルにまとまっているので、追加するのは次の 3 つです。
+
+1. `config.yml` の `domain_handlers` と `relay`
+   ([`config/config.sample.yml`](https://github.com/Amakata/sekimore-gw/blob/main/config/config.sample.yml) の末尾が現在の雛形)
+2. [`docker-compose.relay.yml`](examples/sgw-sample/.devcontainer/docker-compose.relay.yml) の複製。
+   `devcontainer.json` の `dockerComposeFile` に、`docker-compose.yml` の**後ろ**に並べます。
+   ssh-agent のマウントと使い捨ての鍵の volume はこのファイルに入っています
+3. `.env.sample` を `.env` に複製し、プロジェクト名などの値を埋めたもの (上の overlay が読みます)
+
+そのあと `mise run gw:unlock`、`gw:login`、`dev:signing-key`、`relay:verify` を順に実行します。
+
+関所の利用をやめるには、`dockerComposeFile` から overlay を外し、`config.yml` から
+`domain_handlers` と `relay` を削除します。ゲートウェイは 0.0.x と同じ動作に戻ります。
+
+これらをすべて追加すると `.devcontainer/` は 0.0.x の構成とは大きく異なるものになるため、
+**雛形を複製し直して `allow_domains` などの設定を移すほうが早いです。**
+
+このガイドの後の節にある破壊的変更 (0.1.9、0.2.7 など) が影響するのは、0.1.x から関所を使っている構成だけです。
+0.0.x から上げる場合は現在の雛形で関所を新規に設定するので、どれも該当しません。
 
 ## 0.1.9 権限の書き方が変わった
 
