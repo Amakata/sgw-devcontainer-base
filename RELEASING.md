@@ -45,3 +45,13 @@ To take the relay from a locally built sekimore-gw image, override the gateway i
 ```sh
 docker build -t sgw-devcontainer-base:dev --build-arg SEKIMORE_GW_IMAGE=sekimore-gw:relay-dev .
 ```
+
+## Tags pushed to GHCR
+
+GitHub Actions (`.github/workflows/build-and-push.yml`) pushes the following tags:
+
+| Trigger | Tags |
+| --- | --- |
+| Push to `main` | `main`, `latest`, `sha-<short>` |
+| Push of a `v1.2.3` tag | `1.2.3`, `1.2`, `1`, `sha-<short>` |
+| Pull request | (build only, nothing pushed) |

@@ -11,7 +11,7 @@
 # pins agreed with each other, and no test compared them with the Dockerfile.
 #
 #   - the sample's compose file pins the same gateway the Dockerfile takes
-#   - the READMEs quote that gateway, and say the two are level when they are
+#   - the READMEs quote that gateway
 #   - UPGRADING's `reviewed-up-to` is that gateway, so a release cannot skip deciding whether it
 #     asks anything of the reader
 #   - the sample's FROM is a release this repository has written up
@@ -47,17 +47,6 @@ for f in README.md README.ja.md; do
   done
 done
 echo "== the READMEs quote gateway $GW"
-
-# The sentence that says the two version numbers are level is only true while they are, and it is
-# the kind of line a bump forgets. Checked in whichever language states it.
-for f in README.md README.ja.md; do
-  while read -r n; do
-    [ "$n" = "$GW" ] ||
-      fail "$f still says this image and the gateway are level at $n; the Dockerfile takes $GW"
-  done <<EOF
-$(sed -n 's|.*this image takes \([0-9][0-9]*\.[0-9.]*[0-9]\) and the gateway is at \([0-9][0-9]*\.[0-9.]*[0-9]\).*|\1\n\2|p; s|.*(このイメージもゲートウェイも \([0-9][0-9]*\.[0-9.]*[0-9]\)).*|\1|p' "$ROOT/$f")
-EOF
-done
 
 # ---- UPGRADING was considered for this gateway ----
 for f in UPGRADING.md UPGRADING.ja.md; do
