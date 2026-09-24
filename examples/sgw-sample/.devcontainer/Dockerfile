@@ -5,7 +5,7 @@
 # Builds on sgw-devcontainer-base. Only project-specific extras go here.
 # Base tools (zsh, mise, aws-cli, docker, sekimore agent-setup script, gh, ...)
 # are already baked in.
-FROM ghcr.io/amakata/sgw-devcontainer-base:0.2.26
+FROM ghcr.io/amakata/sgw-devcontainer-base:0.2.27
 
 # ---------------------------------------------------------------------------
 # Language build dependencies
