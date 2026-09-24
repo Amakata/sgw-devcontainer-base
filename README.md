@@ -9,78 +9,6 @@ so that every build after it is fast.
 Published at: `ghcr.io/amakata/sgw-devcontainer-base`
 Platforms: `linux/amd64`, `linux/arm64`
 
-## What's inside
-
-- Base: `mcr.microsoft.com/devcontainers/base:bookworm` (`vscode` user, uid=1000)
-- Shell tooling: `fzf`, `iptables`, `iproute2`, `iputils-ping`, `dnsutils`, `jq`, `nano`, `vim`, `pv`, `wget`, `curl`, `unzip`, `sudo`, `rsync`, `gnupg`
-- DB client dev headers: `libpq-dev`, `default-libmysqlclient-dev`
-- `git-delta`
-- zsh + oh-my-zsh + plugins
-  (`zsh-completions`, `zsh-autosuggestions`, `zsh-syntax-highlighting`,
-   `fast-syntax-highlighting`, `zsh-autocomplete`)
-- **`mise` (jdx/mise) pre-installed**
-  One binary that manages python / node / ruby / php / rust / go and the rest.
-  No language version is included — `mise use -g python@3.13.0` and the like belong
-  to the project. The shims directory (`~/.local/share/mise/shims`) is first on
-  `ENV PATH` in the Dockerfile, so a language command resolves **from a
-  non-interactive process** too: a tool call from Claude Code, `docker exec cmd`,
-  a postCreateCommand. To pre-install a language in the project's own image, stage
-  `~/.local/share/mise/installs` into `~/.local/share/mise/installs-default`; a volume
-  mount then leaves it empty, and post-create restores it with
-  `rsync -a --ignore-existing ~/.local/share/mise/installs-default/ \
-    ~/.local/share/mise/installs/ && mise reshim`
-  (see the sample, `examples/sgw-sample/`)
-- Claude Code CLI
-- AWS CLI v2
-- Docker CE + buildx + compose plugin
-- The `sekimore-gw` agent-setup script (`/usr/local/bin/sekimore-agent-setup.sh`),
-  the `sekimore-relay` CLI (`/usr/local/bin/sekimore-relay`) and the `sekimore` wrapper.
-  All of them are taken with `COPY --from` out of the **same `sekimore-gw` image**, so
-  they cannot drift apart. Which gateway that is, is decided by `ARG SEKIMORE_GW_IMAGE`
-  in the Dockerfile — currently `ghcr.io/amakata/sekimore-gw:0.2.32` — and by nothing
-  else; a local build overrides it with `--build-arg SEKIMORE_GW_IMAGE=...`.
-  When the gateway runs the relay (the git / GitHub API relay), agent-setup arranges the
-  disposable key, the project token, `known_hosts` and the signing key on its own (see
-  `examples/sgw-sample/.devcontainer/docker-compose.relay.yml`).
-  A token lasts `relay.token_ttl` (12 hours by default) and, when it expires, the
-  `sekimore` wrapper re-runs the bootstrap and gets another — the container does not
-  have to be restarted
-- Default zsh rc.d snippets (`/etc/skel/zsh-rc.d/`)
-  XDG settings, mise activate, aliases, plugin configuration. Post-create copies them
-  into `~/.config/zsh/rc.d/`
-
-## What's NOT inside
-
-Nothing project-specific. The project's own devcontainer provides:
-
-- Build dependencies for a language (`build-essential`, `autoconf`, `libssl-dev`,
-  `libyaml-dev`, `libxml2-dev` and so on) — needed where `mise` builds a language from
-  source (Ruby, PHP). The sample `examples/sgw-sample/Dockerfile` shows Ruby and Rust
-  enabled and PHP commented out
-- The `sekimore-gw` service itself (a separate service in docker-compose)
-- Per-project configuration: `.env`, `config.yml`, the squid settings
-- A project's own zsh rc.d overlay, where it overrides or adds to the defaults
-- The workspace mount
-- The runtime privileges the Docker daemon needs (`NET_ADMIN`, `privileged`, cgroup,
-  the `/var/lib/docker` volume)
-
-## Usage
-
-The complete sample is [`examples/sgw-sample/`](examples/sgw-sample/). Its `mise.toml`
-collects the host-side operations (`mise run vscode` / `gw:login` / `relay:verify` …).
-The smallest possible use is:
-
-```dockerfile
-# a version, not latest: `mise run upgrade` reads it and moves it
-FROM ghcr.io/amakata/sgw-devcontainer-base:0.2.26
-
-# only what this project adds
-# e.g. mise use -g python@3.13.0 && mise reshim
-```
-
-> After introducing a new language version with `mise use -g`, run `mise reshim` to
-> regenerate the shims directory.
-
 ## Getting started (a new project)
 
 This image is not usable on its own. It needs two containers in one compose stack —
@@ -119,6 +47,81 @@ that matter:
 Everything you copy **is yours from that moment, except `.devcontainer/sgw/`** — the host
 scripts and tasks, which `mise run upgrade:apply` replaces. Put your own tasks in
 `mise.toml`; a task there with the same name as a distributed one wins.
+
+### The smallest possible use
+
+Once the stack is in place, all this image asks of a project's own Dockerfile is:
+
+```dockerfile
+# a version, not latest: `mise run upgrade` reads it and moves it
+FROM ghcr.io/amakata/sgw-devcontainer-base:0.2.30
+
+# only what this project adds
+# e.g. mise use -g python@3.13.0 && mise reshim
+```
+
+> After introducing a new language version with `mise use -g`, run `mise reshim` to
+> regenerate the shims directory.
+
+## What's inside
+
+| | |
+|---|---|
+| Base | `mcr.microsoft.com/devcontainers/base:bookworm` (`vscode` user, uid=1000) |
+| Shell | zsh + oh-my-zsh + plugins, `fzf`, `jq`, `vim`, `nano`, `curl`, `wget`, `unzip`, `rsync`, `pv`, `gnupg`, `sudo` |
+| Network | `iptables`, `iproute2`, `iputils-ping`, `dnsutils` |
+| Git | `git-delta` |
+| DB headers | `libpq-dev`, `default-libmysqlclient-dev` |
+| Languages | `mise` — one binary for python / node / ruby / php / rust / go. No version is baked in ([below](#mise-and-the-shims)) |
+| AI | Claude Code CLI, OpenAI Codex CLI |
+| Cloud | AWS CLI v2, Docker CE + buildx + compose |
+| Gateway | `sekimore-agent-setup.sh`, the `sekimore-relay` CLI and the `sekimore` wrapper ([below](#the-gateway-tools)) |
+| zsh defaults | `/etc/skel/zsh-rc.d/` — XDG settings, mise activate, aliases, plugins. Post-create copies them into `~/.config/zsh/rc.d/` |
+
+### mise and the shims
+
+No language version is included: `mise use -g python@3.13.0` and the like belong to the
+project. The shims directory (`~/.local/share/mise/shims`) is first on `ENV PATH`, so a
+language command resolves **from a non-interactive process** too — a tool call from Claude
+Code, `docker exec cmd`, a postCreateCommand. `/etc/profile.d` puts it back for login
+shells, which Debian's `/etc/profile` would otherwise drop.
+
+To pre-install a language in the project's own image, stage `~/.local/share/mise/installs`
+into `~/.local/share/mise/installs-default`. A volume mount then leaves the first empty, and
+post-create restores it:
+
+```bash
+rsync -a --ignore-existing ~/.local/share/mise/installs-default/ \
+  ~/.local/share/mise/installs/ && mise reshim
+```
+
+### The gateway tools
+
+All three are taken with `COPY --from` out of the **same `sekimore-gw` image**, so they
+cannot drift apart. Which gateway that is, is decided by `ARG SEKIMORE_GW_IMAGE` in the
+Dockerfile — currently `ghcr.io/amakata/sekimore-gw:0.2.32` — and by nothing else; a local
+build overrides it with `--build-arg SEKIMORE_GW_IMAGE=...`.
+
+When the gateway runs the relay, agent-setup arranges the disposable key, the project token,
+`known_hosts` and the signing key on its own (see
+`examples/sgw-sample/.devcontainer/docker-compose.relay.yml`). A token lasts
+`relay.token_ttl` (12 hours by default); when it expires the `sekimore` wrapper re-runs the
+bootstrap and gets another, so the container does not have to be restarted.
+
+## What's NOT inside
+
+Nothing project-specific. The project's own devcontainer provides:
+
+- Build dependencies for a language (`build-essential`, `autoconf`, `libssl-dev`,
+  `libyaml-dev`, `libxml2-dev` and so on) — needed where `mise` builds a language from
+  source (Ruby, PHP). The sample `examples/sgw-sample/Dockerfile` shows Ruby and Rust
+  enabled and PHP commented out
+- The `sekimore-gw` service itself (a separate service in docker-compose)
+- Per-project configuration: `.env`, `config.yml`, the squid settings
+- A project's own zsh rc.d overlay, where it overrides or adds to the defaults
+- The workspace mount
+- The runtime privileges the Docker daemon needs (`NET_ADMIN`, `privileged`, cgroup,
+  the `/var/lib/docker` volume)
 
 ## Keeping up to date
 

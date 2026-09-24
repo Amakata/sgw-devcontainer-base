@@ -77,4 +77,15 @@ grep -q "^## $base[ (（]" "$ROOT/CHANGELOG.ja.md" ||
   fail "CHANGELOG.ja.md has no entry for base $base, though CHANGELOG.md does"
 echo "== the sample starts from base $base, which is written up"
 
+# The READMEs show a project's own FROM line. It is the first thing a new project copies, so a
+# stale one hands out a version that is behind before anything else happens — 0.2.26 sat there
+# while the sample had moved four releases on.
+for f in README.md README.ja.md; do
+  for v in $(sed -n 's|.*ghcr.io/amakata/sgw-devcontainer-base:\([0-9][0-9]*\.[0-9.]*[0-9]\).*|\1|p' "$ROOT/$f"); do
+    [ "$v" = "$base" ] ||
+      fail "$f shows base $v in a FROM line, the sample pins $base; a new project would start behind"
+  done
+done
+echo "== the READMEs show base $base"
+
 echo "PASS: every version agrees with the Dockerfile"
