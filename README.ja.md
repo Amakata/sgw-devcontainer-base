@@ -78,7 +78,7 @@ gateway が読むキーは全部そこにある。設定してあるものはそ
 
 ```dockerfile
 # latest ではなく版を書く。`mise run upgrade` がこれを読んで上げる
-FROM ghcr.io/amakata/sgw-devcontainer-base:0.2.33
+FROM ghcr.io/amakata/sgw-devcontainer-base:0.2.34
 
 # プロジェクト固有の追加だけを書く
 # 例: mise use -g python@3.13.0 && mise reshim
@@ -123,7 +123,7 @@ rsync -a --ignore-existing ~/.local/share/mise/installs-default/ \
 
 3 つとも **同じ `sekimore-gw` イメージ** から `COPY --from` で取るので、版がずれない。
 どの版を取るかを決めるのは Dockerfile の `ARG SEKIMORE_GW_IMAGE`
-(現在 `ghcr.io/amakata/sekimore-gw:0.2.35`) で、ここが唯一の出どころ。
+(現在 `ghcr.io/amakata/sekimore-gw:0.2.36`) で、ここが唯一の出どころ。
 ローカルビルドでは `--build-arg SEKIMORE_GW_IMAGE=...` で差し替えられる。
 
 gateway に relay が居れば、agent-setup が使い捨て鍵・案件トークン・`known_hosts`・
@@ -238,14 +238,14 @@ GitHub Actions (`.github/workflows/build-and-push.yml`) が次のタグで GHCR 
 
 このイメージが **dev コンテナに入れる** gateway — `sekimore` CLI と `agent-setup.sh` —
 を決めるのは Dockerfile の `ARG SEKIMORE_GW_IMAGE` ただ一つで、いまは
-`ghcr.io/amakata/sekimore-gw:0.2.35`。ローカルビルドでは
+`ghcr.io/amakata/sekimore-gw:0.2.36`。ローカルビルドでは
 `--build-arg SEKIMORE_GW_IMAGE=...` で差し替えられる。どのリリースがどの版を取ったかは
 [CHANGELOG.ja.md](CHANGELOG.ja.md) にリリースごとに書いてある。
 
 **プロジェクトが実際に動かす** gateway はこれとは別で、
 `.devcontainer/docker-compose.yml` の `image:` タグ。そちらは独立に動かせる。
 上げて `mise run gw:recreate` すればよく、このイメージを待つ必要は無い。
-いまは揃っている (このイメージも gateway も 0.2.35)。gateway の各版が何を要求するかは
+いまは揃っている (このイメージも gateway も 0.2.36)。gateway の各版が何を要求するかは
 [UPGRADING.ja.md](UPGRADING.ja.md) にある。ほとんどは何も要求しない。
 
 更新順序: sekimore-gw をタグ → GHCR 公開 → このリポジトリの `SEKIMORE_GW_IMAGE` 既定を上げて push →

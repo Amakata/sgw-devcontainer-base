@@ -14,6 +14,12 @@ DevContainer のベースイメージ — Dockerfile と焼き込む道具、同
 0.2.18 から始める。それ以前のリリースはここに書かない。各 PR とタグが記録。
 取り込んだ gateway の版だけは末尾にある。
 
+## 0.2.34（2026-09-24）
+
+### Security
+
+- sekimore-gw 0.2.36 を取り込む。許可した名前が link-local (IMDS)、ループバック、RFC1918、carrier-grade NAT に解決したら宛先として拒否するようになる (#178)
+
 ## 0.2.33（2026-09-24）
 
 ### Enhancement

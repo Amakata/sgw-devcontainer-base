@@ -17,6 +17,12 @@ Starts at 0.2.18. Releases before it are not written up here; the pull requests
 and the tag on each are the record. The gateway each of them took is at the
 bottom.
 
+## 0.2.34 (2026-09-24)
+
+### Security
+
+- takes sekimore-gw 0.2.36, which refuses a destination an allowed name may not reach: an allowlisted domain resolving into link-local (IMDS), loopback, RFC1918 or carrier-grade NAT is denied (#178)
+
 ## 0.2.33 (2026-09-24)
 
 ### Enhancement
