@@ -15,7 +15,6 @@ sekimore-gw (セキュリティゲートウェイ) を経由するネットワ�
 - Shell tooling: `fzf`, `iptables`, `iproute2`, `iputils-ping`, `dnsutils`, `jq`, `nano`, `vim`, `pv`, `wget`, `curl`, `unzip`, `sudo`, `rsync`, `gnupg`
 - DB client dev headers: `libpq-dev`, `default-libmysqlclient-dev`
 - `git-delta`
-- **GitHub CLI (`gh`)**
 - zsh + oh-my-zsh + プラグイン
   (`zsh-completions`, `zsh-autosuggestions`, `zsh-syntax-highlighting`,
    `fast-syntax-highlighting`, `zsh-autocomplete`)
