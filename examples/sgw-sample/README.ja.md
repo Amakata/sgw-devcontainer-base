@@ -45,6 +45,8 @@
    届いていないこと、関所を経由した git、プロジェクト外のリポジトリの拒否を確認する。
 
 日常の操作: `mise run gw:check` (状態)、`mise run gw:tokens`、`mise run gw:audit` (監査ログ)、
+`mise run relay:refresh` (`config.yml` に上流を追加・変更して `mise run gw:restart` した後に。
+Rebuild Container なしで dev の `~/.ssh/config` の Host ブロックとプロキシの環境を作り直す)、
 `mise run gw:revoke-project` (プロジェクトの終了時)、`mise run gw -- <sekimore-relay の任意のサブコマンド>`。
 
 関所を使わずにサンプルを使う場合は、`devcontainer.json` の `dockerComposeFile` から
