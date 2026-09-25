@@ -17,6 +17,14 @@ Starts at 0.2.18. Releases before it are not written up here; the pull requests
 and the tag on each are the record. The gateway each of them took is at the
 bottom.
 
+## 0.2.41 (2026-09-25)
+
+### Security
+
+- takes sekimore-gw 0.2.43, which no longer hands out the upstream proxy password from `/api/config`
+- `relay:verify` checks it: from dev, the gateway's API must not carry the upstream proxy password (#95)
+- rotate the upstream proxy password after upgrading: the old one was readable from the dev container
+
 ## 0.2.40 (2026-09-25)
 
 ### Security
