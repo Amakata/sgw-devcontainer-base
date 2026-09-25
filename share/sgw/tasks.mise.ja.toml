@@ -86,7 +86,7 @@ run = 'bash "$SGW" dev cat /home/vscode/.ssh/sekimore/signing_ed25519.pub'
 
 # ---- The acceptance check ----
 ["relay:verify"]
-description = "relay の受け入れ確認: gateway の状態 / dev に依頼者の agent が届いていないこと / dev から関所経由の git"
+description = "relay の受け入れ確認: gateway の状態 / dev に依頼者の agent が届いていないこと / dev から関所経由の git・HTTPS・GitHub API 1 回"
 run = '''
 set -u
 fail=0
@@ -99,7 +99,9 @@ fi
 ok()   { printf '%sOK:%s %s\n' "$c_ok" "$c_off" "$*"; }
 fail() { printf '%s❌ FAIL:%s %s\n' "$c_bad" "$c_off" "$*"; fail=1; }
 echo "== gateway: sekimore-relay check"
-bash "$SGW" gw sekimore-relay check | sed -n '/^state:/,$p'
+# kept whole: the 443 target: lines pick the domain the HTTPS probe below goes to
+gwcheck=$(bash "$SGW" gw sekimore-relay check || true)
+printf '%s\n' "$gwcheck" | sed -n '/^state:/,$p'
 echo
 echo "== dev: only the gateway's filtered signing key may be reachable"
 n=$(bash "$SGW" dev sh -c 'set -a; . /etc/sekimore-agent/env 2>/dev/null; set +a; ssh-add -l 2>/dev/null' | grep -c . || true)
@@ -169,7 +171,9 @@ case "$state" in
 esac
 echo
 echo "== dev: relay token (sekimore whoami)"
-bash "$SGW" dev sekimore whoami || fail=1
+# kept whole: the permissions line picks the GitHub API call the probe below makes
+who=$(bash "$SGW" dev sekimore whoami 2>&1) || fail=1
+printf '%s\n' "$who"
 echo
 echo "== dev: git ls-remote through the relay (first repo of the project)"
 bash "$SGW" dev sh -c '. /etc/sekimore-agent/env && git ls-remote "git@$SEKIMORE_GIT_DOMAIN:$SEKIMORE_REPO.git" HEAD' || fail=1
@@ -178,6 +182,46 @@ if bash "$SGW" dev sh -c '. /etc/sekimore-agent/env && git ls-remote "git@$SEKIM
   ok "denied"
 else
   fail "no 'not in project' denial"
+fi
+echo
+echo "== dev: HTTPS to a relayed domain must reach the upstream (through the upstream proxy when one is configured)"
+# git through the relay is SSH and never touches the upstream proxy, so it stays green while every
+# HTTPS path through the relay is dead (sgw-devcontainer-base#85). This goes the way the API does.
+hint="the relay cut the connection — mise run gw:logs for 'TLS to the proxy failed' or 'https_failed', then mise run gw:check (reach:)"
+targets=$(printf '%s\n' "$gwcheck" | sed -n 's/^ *443 target: *\([^ ]*\).*/\1/p')
+target=$(printf '%s\n' "$targets" | grep -x api.github.com | head -1)
+[ -n "$target" ] || target=$(printf '%s\n' "$targets" | grep -v '^$' | head -1)
+if [ -z "$target" ]; then
+  echo "SKIP: no 443 target configured"
+else
+  # the exit code is curl's own, kept apart from the status code it writes to stdout
+  code=$(bash "$SGW" dev curl -sS -m 10 -o /dev/null -w '%{http_code}' "https://$target/" 2>/dev/null); rc=$?
+  if [ "$rc" -eq 0 ] && [ -n "$code" ]; then
+    ok "https://$target/ answered HTTP $code (any status means the upstream was reached)"
+  else
+    fail "https://$target/ — curl exit $rc. $hint"
+  fi
+fi
+echo
+echo "== dev: one GitHub API call through the relay"
+# sekimore whoami answers out of the gateway's own state and calls no GitHub API; this one does.
+perms=$(printf '%s\n' "$who" | sed -n 's/^permissions[^:]*: *//p' | head -1)
+case " $perms " in
+  *" pr:read "*) probe="pr list --limit 1" ;;
+  *" issue:read "*) probe="issue list --limit 1" ;;
+  *" repo:read "*) probe="repo vocabulary" ;;
+  *) probe= ;;
+esac
+if [ -z "$probe" ]; then
+  echo "SKIP: the project grants no read permission to probe with"
+else
+  err=$(bash "$SGW" dev sekimore $probe 2>&1 >/dev/null); rc=$?
+  if [ "$rc" -eq 0 ]; then
+    ok "sekimore $probe answered"
+  else
+    last=$(printf '%s\n' "$err" | grep -v '^$' | tail -1)
+    fail "sekimore $probe — exit $rc: $last. $hint"
+  fi
 fi
 echo
 echo "== dev: a root process must not route past the gateway (host-side FORWARD rules, gateway 0.2.37)"
