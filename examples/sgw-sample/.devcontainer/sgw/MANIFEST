@@ -1,11 +1,11 @@
 # Written by upgrade.sh: what it last put in this directory, so an edit by hand can be told
 # apart from a file it wrote. Do not edit.
-base 0.2.35
-gateway 0.2.37
+base 0.2.36
+gateway 0.2.38
 lang en
 file sgw.sh 1f460ac16fb262b042d44bdd1c7d48139579b16f6e385bd507fddaf35c9bd929
 file vscode.sh c2b48e260bc54620b907bc072afc4a8117ae0e705325259300a62e8796dad6db
 file upgrade.sh 89fa87d6d958017344b93747d0156ce919f2cc48c1dbd15d1a712cd726c69c21
 file post-start.sh ebbccd10897006511e684f98d753dbc0890052662e6e924c0a0714a7566eb6b9
-file tasks.mise.toml fe364f7fe619d6ce8dad8523bbeaddffa3867397f375c4493c4b40ad3bc97351
+file tasks.mise.toml 400ed4fc6ef08f185454e591fea6b8404294bf26d9ff551dfe4e278bb55bd630
 file gateway.mise.toml 7fbf8c15e32a57bcf11b2405dec0fa496d715a4c1974ea5d83260c9ecba52369

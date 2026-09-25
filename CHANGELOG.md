@@ -17,6 +17,14 @@ Starts at 0.2.18. Releases before it are not written up here; the pull requests
 and the tag on each are the record. The gateway each of them took is at the
 bottom.
 
+## 0.2.36 (2026-09-25)
+
+### Security
+
+- takes sekimore-gw 0.2.38, which closes the host itself to dev: two INPUT rules on the host accept replies to connections the host opened and drop everything else from the internal bridge. dev can no longer reach the host, the published ports of every other container on the machine, or the Docker Desktop VM's services (#190)
+- `relay:verify` checks it: the bridge's `.1` must not answer a ping from dev
+- no file of yours changes; `pid: host` from base 0.2.35 is all the gateway needs
+
 ## 0.2.35 (2026-09-25)
 
 ### Security

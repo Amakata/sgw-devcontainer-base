@@ -201,5 +201,18 @@ else
   esac
 fi
 echo
+echo "== dev: the host itself must not answer dev (host-side INPUT rules, gateway 0.2.38)"
+# The same .1 is the host's own address on the bridge. Two INPUT rules keep it silent: replies to
+# connections the host opened are accepted, everything else from the bridge is dropped. Without
+# them dev reaches the host, every port a container on the machine publishes, and the VM's services.
+if [ -n "$bridge_gw" ]; then
+  if bash "$SGW" dev ping -c1 -W2 "$bridge_gw" >/dev/null 2>&1; then
+    echo "❌ FAIL: dev reached the host at $bridge_gw. Gateway 0.2.38 or later drops this; run: mise run gw:recreate"
+    fail=1
+  else
+    echo "OK: no answer from $bridge_gw"
+  fi
+fi
+echo
 [ "$fail" -eq 0 ] && echo "relay:verify: all checks passed" || { echo "relay:verify: FAILED"; exit 1; }
 '''
