@@ -17,6 +17,14 @@ Starts at 0.2.18. Releases before it are not written up here; the pull requests
 and the tag on each are the record. The gateway each of them took is at the
 bottom.
 
+## 0.2.42 (2026-09-25)
+
+### Enhancement
+
+- takes sekimore-gw 0.2.44: ProxyJump bastions are held to the upstream's known_hosts, and keyscan and login go through the bastion (sekimore-gw#220, sekimore-gw#221)
+- `relay:verify` names the path-ledger edge each item probes, e.g. `[dev.egress.route_past_gateway]` (#99)
+- `relay:refresh` rebuilds dev's Host blocks and proxy environment without Rebuild Container (#98)
+
 ## 0.2.41 (2026-09-25)
 
 ### Security

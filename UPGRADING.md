@@ -1,4 +1,4 @@
-<!-- reviewed-up-to: 0.2.43 -->
+<!-- reviewed-up-to: 0.2.44 -->
 # Upgrading: the changes each release requires
 
 *[日本語版](UPGRADING.ja.md)*
@@ -34,6 +34,7 @@ changed in each release, see the changelogs:
 | 0.2.27 | [0.2.28](#0228-dependabot-alerts-are-optional), **only if you want the agent to read Dependabot alerts** |
 | 0.2.28 | [0.2.29](#0229-unattended-unlock-is-available), **only if you want unattended unlock or want AI commits to remain Verified** |
 | 0.2.29 – 0.2.36 | [0.2.37](#0237-the-gateway-needs-pid-host), **everyone** |
+| 0.2.37 – 0.2.43 | [0.2.44](#0244-a-proxyjump-bastions-host-key-has-to-be-known), **only if an upstream uses a `ProxyJump` bastion** |
 
 Independently of the gateway version, a project created before base 0.2.20 must move to
 `.devcontainer/sgw/` once, by hand. See
@@ -492,6 +493,33 @@ It prints "Host-side FORWARD enforcement in place". Without `pid: host`, it prin
 through the bridge's own router and expects the connection to fail.
 
 0.2.30 – 0.2.36 require no action.
+
+## 0.2.44 a ProxyJump bastion's host key has to be known
+
+**This section applies only if an upstream in `config.yml` has `ProxyJump` in its
+`relay.ssh_options`.** Without a bastion there is nothing to do.
+
+Until now the jump hop was reached with whatever the relay's ssh defaults allowed. From 0.2.44
+every hop, the bastion included, is verified with `StrictHostKeyChecking yes` against the
+upstream's known_hosts. A bastion whose key is not there no longer prompts and no longer passes:
+git through the relay fails closed, with the keyscan command to run.
+
+Run one of the following once after `mise run gw:recreate`:
+
+```bash
+mise run gw:login          # fetches the missing bastion keys, shows the fingerprints, asks yes/no
+```
+
+or, to take the keys without logging in again:
+
+```bash
+docker compose exec sekimore-gw sekimore-relay keyscan <bastion> --port <port>
+docker compose exec sekimore-gw sekimore-relay keyscan <upstream-host> --port <port> --upstream <domain>
+```
+
+The second one goes through the bastion, so run it after the first.
+
+0.2.38 – 0.2.43 require no action.
 
 ## base 0.2.19 `mise run web` finds the port itself
 

@@ -14,6 +14,14 @@ DevContainer のベースイメージ — Dockerfile と焼き込む道具、同
 0.2.18 から始める。それ以前のリリースはここに書かない。各 PR とタグが記録。
 取り込んだ gateway の版だけは末尾にある。
 
+## 0.2.42（2026-09-25）
+
+### Enhancement
+
+- sekimore-gw 0.2.44 を取り込む。ProxyJump の踏み台を上流の known_hosts で検証し、keyscan と login は踏み台経由で行く (sekimore-gw#220, sekimore-gw#221)
+- `relay:verify` が各項目の確かめる経路台帳の辺を示す。例: `[dev.egress.route_past_gateway]` (#99)
+- `relay:refresh` が Rebuild Container なしに dev の Host ブロックとプロキシ環境変数を作り直す (#98)
+
 ## 0.2.41（2026-09-25）
 
 ### Security
