@@ -144,12 +144,15 @@ else
 fi
 ok()   { printf '%sOK:%s %s\n' "$c_ok" "$c_off" "$*"; }
 fail() { printf '%s❌ FAIL:%s %s\n' "$c_bad" "$c_off" "$*"; fail=1; }
+# The [ids] at the end of a heading name the rows of docs/paths.yml in sekimore-gw (the path
+# ledger, sekimore-gw#223): who resolves, who verifies the peer, what is presented, where it is
+# audited, and the code and tests behind the item.
 echo "== gateway: sekimore-relay check"
 # kept whole: the 443 target: lines pick the domain the HTTPS probe below goes to
 gwcheck=$(bash "$SGW" gw sekimore-relay check || true)
 printf '%s\n' "$gwcheck" | sed -n '/^state:/,$p'
 echo
-echo "== dev: only the gateway's filtered signing key may be reachable"
+echo "== dev: only the gateway's filtered signing key may be reachable [dev.signing]"
 n=$(bash "$SGW" dev sh -c 'set -a; . /etc/sekimore-agent/env 2>/dev/null; set +a; ssh-add -l 2>/dev/null' | grep -c . || true)
 if [ "$n" = 1 ]; then
   ok "exactly one key (the signing key, via the gateway's filtered agent)"
@@ -159,7 +162,7 @@ else
   fail "ssh-add -l lists $n keys inside dev — the operator's keys are exposed to the AI. Reopen with: mise run vscode"
 fi
 echo
-echo "== dev: git signs with the key it is meant to"
+echo "== dev: git signs with the key it is meant to [dev.signing]"
 # The Dev Containers extension copies the host's user.signingkey over the container's on every
 # start; from gateway 0.2.31 agent-setup's own setting wins. An inline key:: value, or a key the
 # signing socket does not offer, makes every commit fail with "Couldn't find key in agent".
@@ -204,7 +207,7 @@ else
 fi
 fi
 echo
-echo "== gateway: the secret store"
+echo "== gateway: the secret store [operator.store]"
 # 0.2.19: the upstream API token lives in the store, so a locked one is not a note —
 # the relay cannot reach the GitHub API at all until someone unlocks it.
 # first line only: the state word. A later gateway may print more under it (0.2.39 did, and
@@ -219,21 +222,21 @@ case "$state" in
     ;;
 esac
 echo
-echo "== dev: relay token (sekimore whoami)"
+echo "== dev: relay token (sekimore whoami) [dev.relay.api]"
 # kept whole: the permissions line picks the GitHub API call the probe below makes
 who=$(bash "$SGW" dev sekimore whoami 2>&1) || fail=1
 printf '%s\n' "$who"
 echo
-echo "== dev: git ls-remote through the relay (first repo of the project)"
+echo "== dev: git ls-remote through the relay (first repo of the project) [dev.relay.ssh, relay.ssh.upstream]"
 bash "$SGW" dev sh -c '. /etc/sekimore-agent/env && git ls-remote "git@$SEKIMORE_GIT_DOMAIN:$SEKIMORE_REPO.git" HEAD' || fail=1
-echo "== dev: a repository outside the project must be denied"
+echo "== dev: a repository outside the project must be denied [dev.relay.ssh]"
 if bash "$SGW" dev sh -c '. /etc/sekimore-agent/env && git ls-remote "git@$SEKIMORE_GIT_DOMAIN:sekimore-test/not-in-project.git" HEAD' 2>&1 | grep -q "not in project"; then
   ok "denied"
 else
   fail "no 'not in project' denial"
 fi
 echo
-echo "== dev: HTTPS to a relayed domain must reach the upstream (through the upstream proxy when one is configured)"
+echo "== dev: HTTPS to a relayed domain must reach the upstream (through the upstream proxy when one is configured) [dev.passthrough, passthrough.upstream]"
 # git through the relay is SSH and never touches the upstream proxy, so it stays green while every
 # HTTPS path through the relay is dead (sgw-devcontainer-base#85). This goes the way the API does.
 hint="the relay cut the connection — mise run gw:logs for 'TLS to the proxy failed' or 'https_failed', then mise run gw:check (reach:)"
@@ -252,7 +255,7 @@ else
   fi
 fi
 echo
-echo "== dev: one GitHub API call through the relay"
+echo "== dev: one GitHub API call through the relay [dev.relay.api, relay.github.api]"
 # sekimore whoami answers out of the gateway's own state and calls no GitHub API; this one does.
 perms=$(printf '%s\n' "$who" | sed -n 's/^permissions[^:]*: *//p' | head -1)
 case " $perms " in
@@ -273,7 +276,7 @@ else
   fi
 fi
 echo
-echo "== dev: the gateway's API must not hand out the upstream proxy password"
+echo "== dev: the gateway's API must not hand out the upstream proxy password [dev.webui]"
 # sekimore-gw#217: /api/config carried squid.config_text verbatim, and with a TLS upstream proxy
 # that text holds `login=<user>:<password>` — anything in dev could read it. Gateway 0.2.43 redacts
 # the password; the password itself still has to be rotated afterwards. Squid's other forms
@@ -292,7 +295,7 @@ else
   fi
 fi
 echo
-echo "== dev: the upstream proxy is used for ordinary traffic (when one is configured)"
+echo "== dev: the upstream proxy is used for ordinary traffic (when one is configured) [dev.squid, dev.egress.direct]"
 # With `upstream_proxy` set, everything dev sends ought to go through the gateway's Squid and out
 # through that proxy. Nothing told dev so until base 0.2.40: HTTP_PROXY and friends now come from
 # agent-setup (/etc/profile.d/sekimore-proxy.sh, and rc.d sources it), and this checks both halves
@@ -337,7 +340,7 @@ else
   fi
 fi
 echo
-echo "== dev: a root process must not route past the gateway (host-side FORWARD rules, gateway 0.2.37)"
+echo "== dev: a root process must not route past the gateway (host-side FORWARD rules, gateway 0.2.37) [dev.egress.route_past_gateway]"
 # The bridge's .1 is Docker's own router. Without the gateway's rules in the host's DOCKER-USER
 # chain, a host route through it reaches the internet by Docker's NAT, around every filter.
 # The address is read from the JSON: mise would take a Go template's braces for its own.
@@ -361,7 +364,7 @@ else
   esac
 fi
 echo
-echo "== dev: the host itself must not answer dev (host-side INPUT rules, gateway 0.2.38)"
+echo "== dev: the host itself must not answer dev (host-side INPUT rules, gateway 0.2.38) [dev.host_input]"
 # The same .1 is the host's own address on the bridge. Two INPUT rules keep it silent: replies to
 # connections the host opened are accepted, everything else from the bridge is dropped. Without
 # them dev reaches the host, every port a container on the machine publishes, and the VM's services.
