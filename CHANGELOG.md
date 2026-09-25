@@ -17,6 +17,15 @@ Starts at 0.2.18. Releases before it are not written up here; the pull requests
 and the tag on each are the record. The gateway each of them took is at the
 bottom.
 
+## 0.2.40 (2026-09-25)
+
+### Security
+
+- takes sekimore-gw 0.2.42
+- dev receives `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` from the gateway when an upstream proxy is configured; the shipped zsh rc.d snippet sources them, so ordinary traffic goes through the gateway instead of leaving directly (#91)
+- `relay:verify` checks that dev's ordinary traffic cannot bypass the upstream when the gateway denies direct egress (#91)
+- Rebuild Container is needed for the rc.d snippet
+
 ## 0.2.39 (2026-09-25)
 
 ### Fix
