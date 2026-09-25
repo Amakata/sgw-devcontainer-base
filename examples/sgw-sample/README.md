@@ -54,7 +54,9 @@ The tasks are defined in `.devcontainer/sgw/`, which `mise run upgrade:apply` ke
    outside the project.
 
 Routine tasks: `mise run gw:check` (state), `mise run gw:tokens`, `mise run gw:audit` (the audit
-log), `mise run gw:revoke-project` (when the project ends) and
+log), `mise run relay:refresh` (after adding or changing an upstream in `config.yml`, and
+`mise run gw:restart`: it rebuilds dev's `~/.ssh/config` Host blocks and the proxy environment
+without Rebuild Container), `mise run gw:revoke-project` (when the project ends) and
 `mise run gw -- <any sekimore-relay subcommand>`.
 
 To use the sample without the relay, remove `docker-compose.relay.yml` from `dockerComposeFile`

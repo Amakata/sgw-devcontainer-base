@@ -84,6 +84,52 @@ run = 'bash "$SGW" dev sudo /usr/local/bin/sekimore-agent-setup.sh'
 description = "AI の署名用公開鍵を表示 (GitHub の Settings → SSH and GPG keys に Signing Key として登録する)"
 run = 'bash "$SGW" dev cat /home/vscode/.ssh/sekimore/signing_ed25519.pub'
 
+# ---- After changing config.yml ----
+["relay:refresh"]
+description = "dev でゲートウェイの agent setup を再実行する (post-start.sh と同じやり方)。Rebuild Container なしで ~/.ssh/config の Host ブロックと上流プロキシの環境を config.yml に合わせる"
+# The Host blocks come from the gateway's configuration and are written by agent-setup at
+# post-start, so an upstream added to config.yml only reaches dev at the next start. This runs
+# the same setup again instead (sgw-devcontainer-base#97). Run it after mise run gw:restart.
+run = '''
+set -u
+echo "== dev: run the gateway's agent setup again (the way post-start.sh does)"
+# The same invocation as share/sgw/post-start.sh: agent-setup as root, with every SEKIMORE_*
+# variable dev has. sudo resets the environment, so a variable reaches agent-setup only if
+# --preserve-env= names it; the names are taken from dev's own environment, so there is no list
+# here to fall behind (post-start.sh says why).
+bash "$SGW" dev sh -c '
+set -e
+agent_setup=${SGW_AGENT_SETUP:-/usr/local/bin/sekimore-agent-setup.sh}
+vars=$(env | sed -n "s/^\(SEKIMORE_[A-Za-z0-9_]*\)=.*/\1/p" | sort -u | paste -sd, -)
+if [ -n "$vars" ]; then
+  sudo --preserve-env="$vars" "$agent_setup"
+else
+  sudo "$agent_setup"
+fi
+' || { echo "relay:refresh: FAILED - sekimore-agent-setup.sh did not finish. Is the gateway up? (mise run gw:check)" >&2; exit 1; }
+echo
+echo "== dev: the Host blocks now in ~/.ssh/config"
+# agent-setup replaces this marked block in place: one Host per upstream the gateway is configured for
+blocks=$(bash "$SGW" dev sh -c 'sed -n "/^# >>> sekimore-relay >>>/,/^# <<< sekimore-relay <<</p" ~/.ssh/config' || true)
+if [ -n "$blocks" ]; then
+  printf '%s\n' "$blocks"
+  printf '%s\n' "$blocks" | sed -n 's/^Host /wrote: Host /p'
+else
+  echo "no sekimore-relay block in ~/.ssh/config - the gateway has no relay, or the setup wrote none"
+fi
+echo
+echo "== dev: the upstream proxy environment (/etc/profile.d/sekimore-proxy.sh)"
+# gateway 0.2.42 and later write it when config.yml sets proxy.upstream_proxy; without one there is none
+if bash "$SGW" dev sh -c 'test -f /etc/profile.d/sekimore-proxy.sh'; then
+  bash "$SGW" dev sh -c 'grep -E "^export (HTTP_PROXY|NO_PROXY)=" /etc/profile.d/sekimore-proxy.sh' || true
+  echo "present - a new shell in dev reads it; a shell already open needs . /etc/profile.d/sekimore-proxy.sh"
+else
+  echo "not present (no upstream proxy configured, or the gateway is older than 0.2.42)"
+fi
+echo
+echo "relay:refresh: done. The Host blocks apply at once; open a new terminal in dev for the proxy environment"
+'''
+
 # ---- The acceptance check ----
 ["relay:verify"]
 description = "relay の受け入れ確認: gateway の状態 / dev に依頼者の agent が届いていないこと / dev から関所経由の git・HTTPS・GitHub API 1 回 / dev の通常の通信が上流プロキシを通ること"
