@@ -14,6 +14,16 @@ DevContainer のベースイメージ — Dockerfile と焼き込む道具、同
 0.2.18 から始める。それ以前のリリースはここに書かない。各 PR とタグが記録。
 取り込んだ gateway の版だけは末尾にある。
 
+## 0.2.39（2026-09-25）
+
+### Fix
+
+- sekimore-gw 0.2.41 を取り込む
+- TLS で話す上流プロキシが再び動く。関所は自身の HTTPS をローカルの Squid 経由で送る
+- `relay:verify` は関所経由の HTTPS と GitHub API 1 回を試す (#86)
+- `relay:verify` と `upgrade.sh` は `store-status` の 1 行目だけを読む (#88)
+- あなたのファイルは変わらない
+
 ## 0.2.38（2026-09-25）
 
 ### Enhancement
