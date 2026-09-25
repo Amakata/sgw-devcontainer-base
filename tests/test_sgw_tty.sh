@@ -45,11 +45,27 @@ echo "== a person at a terminal gets one: dev and gw"
 got=$(run "bash '$SGW' dev zsh")
 case $got in "-it -u vscode cid123 zsh") ;; *) fail "dev zsh from a terminal ran: docker exec $got" ;; esac
 got=$(run "bash '$SGW' gw bash")
-case $got in "-it cid123 bash") ;; *) fail "gw bash from a terminal ran: docker exec $got" ;; esac
+case $got in "-it -e SEKIMORE_COLOR=always cid123 bash") ;; *) fail "gw bash from a terminal ran: docker exec $got" ;; esac
 
-echo "== output piped on: no terminal, so no carriage returns in what is read"
+echo "== output piped on: no terminal, so no carriage returns and no colour in what is read"
+# relay:verify reads this through sed. sgw.sh's stdout is the pipe, so [ -t 1 ] is false: no -t,
+# and no SEKIMORE_COLOR either, leaving the output exactly as it was before #83.
 got=$(run "bash '$SGW' gw sekimore-relay check | cat")
 case $got in "-i cid123 sekimore-relay check") ;; *) fail "a piped gw ran: docker exec $got" ;; esac
+
+echo "== NO_COLOR wins at a terminal, and is handed to the gateway"
+got=$(run "NO_COLOR=1 bash '$SGW' gw bash")
+case $got in "-it -e NO_COLOR cid123 bash") ;; *) fail "gw bash with NO_COLOR ran: docker exec $got" ;; esac
+
+echo "== an explicit SEKIMORE_COLOR is passed through, not overridden"
+got=$(run "SEKIMORE_COLOR=never bash '$SGW' gw bash")
+case $got in "-it -e SEKIMORE_COLOR cid123 bash") ;; *) fail "gw bash with SEKIMORE_COLOR=never ran: docker exec $got" ;; esac
+got=$(run "SEKIMORE_COLOR=always bash '$SGW' gw sekimore-relay check | cat")
+case $got in "-i -e SEKIMORE_COLOR cid123 sekimore-relay check") ;; *) fail "a piped gw with SEKIMORE_COLOR=always ran: docker exec $got" ;; esac
+
+echo "== dev is left alone: the colour is the gateway CLI's"
+got=$(run "bash '$SGW' dev true </dev/null")
+case $got in "-i -u vscode cid123 true") ;; *) fail "dev must carry no colour env: docker exec $got" ;; esac
 
 echo "== stdin not a terminal: no -t, which docker would refuse anyway"
 got=$(run "bash '$SGW' dev true </dev/null")

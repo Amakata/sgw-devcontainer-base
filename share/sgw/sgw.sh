@@ -119,11 +119,23 @@ compose_args() {
 # always answered "no terminal" and interactive shells started without one, waiting on stdin (#50).
 if [ -t 0 ] && [ -t 1 ]; then TTY_OPT=-it; else TTY_OPT=-i; fi
 
+# Let the relay's CLI colour its output when a person is watching. Decided here for the same reason
+# as TTY_OPT: inside "$(...)" stdout is the substitution's pipe and [ -t 1 ] is always false. So
+# `mise run gw:check` at a terminal gets colour, while `$(mise run gw:check)` and relay:verify's
+# `bash "$SGW" gw sekimore-relay check | sed …` stay plain — the `| sed` keeps stdout a pipe, so
+# nothing is injected there and its output is unchanged.
+# An explicit SEKIMORE_COLOR from the caller wins; NO_COLOR is handed through when it is set.
+COLOR_ENV=()
+if [ -n "${SEKIMORE_COLOR:-}" ]; then COLOR_ENV=(-e SEKIMORE_COLOR)
+elif [ -t 1 ] && [ -z "${NO_COLOR+x}" ]; then COLOR_ENV=(-e SEKIMORE_COLOR=always)
+fi
+if [ -n "${NO_COLOR+x}" ]; then COLOR_ENV+=(-e NO_COLOR); fi
+
 case "${1:-}" in
   gw)
     shift; cid=$(find_container sekimore-gw)
     if [ $# -eq 0 ]; then set -- sekimore-relay check; fi
-    exec docker exec "$TTY_OPT" "$cid" "$@" ;;
+    exec docker exec "$TTY_OPT" ${COLOR_ENV[@]+"${COLOR_ENV[@]}"} "$cid" "$@" ;;
   # Always -it, for a command that reads a passphrase. the plain `gw` asks for stdout as well, and a
   # task runner that prefixes output makes stdout a pipe — so the detection says "no terminal"
   # while the person is sitting at one. What matters here is stdin, and asking for a terminal we
@@ -131,7 +143,7 @@ case "${1:-}" in
   gw-tty)
     shift; cid=$(find_container sekimore-gw)
     [ -t 0 ] || { say needs_tty "$*" >&2; exit 2; }
-    exec docker exec -it "$cid" "$@" ;;
+    exec docker exec -it ${COLOR_ENV[@]+"${COLOR_ENV[@]}"} "$cid" "$@" ;;
   dev)
     shift; cid=$(find_container dev)
     if [ $# -eq 0 ]; then set -- zsh; fi
