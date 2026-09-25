@@ -14,6 +14,13 @@ DevContainer のベースイメージ — Dockerfile と焼き込む道具、同
 0.2.18 から始める。それ以前のリリースはここに書かない。各 PR とタグが記録。
 取り込んだ gateway の版だけは末尾にある。
 
+## 0.2.43（2026-09-25）
+
+### Enhancement
+
+- `sgw.sh` が Docker CLI の "What's next" の案内を抑えるようにした。`relay:verify` の出力に紛れ込んでいた (#102)
+- sekimore-gw 0.2.45 を取り込む。`gw:login` が端末上で動き、ホスト鍵を保存できなかったときは device flow の前で止まる。監査の各行が経路台帳の辺を示す (sekimore-gw#230, sekimore-gw#228)
+
 ## 0.2.42（2026-09-25）
 
 ### Enhancement

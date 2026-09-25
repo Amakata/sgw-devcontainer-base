@@ -1,4 +1,4 @@
-<!-- reviewed-up-to: 0.2.44 -->
+<!-- reviewed-up-to: 0.2.45 -->
 # Upgrading: the changes each release requires
 
 *[日本語版](UPGRADING.ja.md)*
@@ -35,6 +35,7 @@ changed in each release, see the changelogs:
 | 0.2.28 | [0.2.29](#0229-unattended-unlock-is-available), **only if you want unattended unlock or want AI commits to remain Verified** |
 | 0.2.29 – 0.2.36 | [0.2.37](#0237-the-gateway-needs-pid-host), **everyone** |
 | 0.2.37 – 0.2.43 | [0.2.44](#0244-a-proxyjump-bastions-host-key-has-to-be-known), **only if an upstream uses a `ProxyJump` bastion** |
+| 0.2.44 | [0.2.45](#0245-gwlogin-asks-on-a-terminal-and-stops-without-a-host-key), **only if an upstream needs a host key the gateway has not saved** |
 
 Independently of the gateway version, a project created before base 0.2.20 must move to
 `.devcontainer/sgw/` once, by hand. See
@@ -520,6 +521,26 @@ docker compose exec sekimore-gw sekimore-relay keyscan <upstream-host> --port <p
 The second one goes through the bastion, so run it after the first.
 
 0.2.38 – 0.2.43 require no action.
+
+## 0.2.45 `gw:login` asks on a terminal and stops without a host key
+
+**This section applies only if an upstream in `config.yml` needs a host key the gateway has not
+saved yet** — a `ProxyJump` bastion, or an upstream whose key was never scanned.
+
+`gw:login` now takes the host keys it needs before the device flow and asks yes/no on a terminal.
+When a key it needs was not saved — the question was declined, there was no terminal, or the scan
+failed — the login stops with a non-zero exit instead of handing out a token git cannot use.
+
+Run `mise run upgrade:apply` to get the new task file, then `mise run gw:login` again.
+
+To skip the question, take the keys first:
+
+```bash
+mise run gw -- keyscan <bastion> --port <port> --upstream <domain>
+mise run gw -- keyscan <upstream-host> --port <port> --upstream <domain>
+```
+
+The second one goes through the bastion, so run it after the first.
 
 ## base 0.2.19 `mise run web` finds the port itself
 
