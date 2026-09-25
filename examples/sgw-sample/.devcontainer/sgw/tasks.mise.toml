@@ -86,7 +86,7 @@ run = 'bash "$SGW" dev cat /home/vscode/.ssh/sekimore/signing_ed25519.pub'
 
 # ---- The acceptance check ----
 ["relay:verify"]
-description = "the relay's acceptance check: the gateway's state, that the operator's agent does not reach dev, git, HTTPS and one GitHub API call through the relay from dev, and that dev's ordinary traffic takes the upstream proxy"
+description = "the relay's acceptance check: the gateway's state, that the operator's agent does not reach dev, git, HTTPS and one GitHub API call through the relay from dev, and that dev's ordinary traffic takes the upstream proxy, and that the API hands out no credential"
 run = '''
 set -u
 fail=0
@@ -224,6 +224,25 @@ else
   else
     last=$(printf '%s\n' "$err" | grep -v '^$' | tail -1)
     fail "sekimore $probe — exit $rc: $last. $hint"
+  fi
+fi
+echo
+echo "== dev: the gateway's API must not hand out the upstream proxy password"
+# sekimore-gw#217: /api/config carried squid.config_text verbatim, and with a TLS upstream proxy
+# that text holds `login=<user>:<password>` — anything in dev could read it. Gateway 0.2.43 redacts
+# the password; the password itself still has to be rotated afterwards. Squid's other forms
+# (`login=PASS`, `login=NEGOTIATE`) carry no colon and no secret.
+body=$(bash "$SGW" dev curl -sS -m 5 http://sekimore-gw:8080/api/config 2>/dev/null || true)
+if [ -z "$body" ]; then
+  echo "SKIP: the gateway's API is not reachable from dev"
+else
+  # that field is JSON-escaped for quotes, backslashes and newlines only, so a redacted entry reads
+  # literally `login=user:***`. Any other value after the colon is the password itself.
+  leak=$(printf '%s' "$body" | grep -oE 'login=[^:"\ ]+:[^"\ ]+' | grep -v ':\*\*\*$' | head -1)
+  if [ -n "$leak" ]; then
+    fail "the upstream proxy password is readable from dev in /api/config (gateway 0.2.43 or later redacts it; rotate the password after upgrading)"
+  else
+    ok "no credential in /api/config"
   fi
 fi
 echo
