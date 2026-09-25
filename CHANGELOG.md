@@ -17,6 +17,16 @@ Starts at 0.2.18. Releases before it are not written up here; the pull requests
 and the tag on each are the record. The gateway each of them took is at the
 bottom.
 
+## 0.2.39 (2026-09-25)
+
+### Fix
+
+- takes sekimore-gw 0.2.41
+- an upstream proxy that speaks TLS works again: the relay sends its HTTPS through the local Squid
+- `relay:verify` probes HTTPS through the relay and one GitHub API call (#86)
+- `relay:verify` and `upgrade.sh` read only the first line of `store-status` (#88)
+- no file of yours changes
+
 ## 0.2.38 (2026-09-25)
 
 ### Enhancement
