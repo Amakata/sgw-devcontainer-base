@@ -17,6 +17,15 @@ Starts at 0.2.18. Releases before it are not written up here; the pull requests
 and the tag on each are the record. The gateway each of them took is at the
 bottom.
 
+## 0.2.38 (2026-09-25)
+
+### Enhancement
+
+- takes sekimore-gw 0.2.40
+- `relay:verify` prints OK in green and FAIL in red at a terminal, and the `gw:*` tasks let the relay's `check` and `store-status` color their state words (#84)
+- `NO_COLOR` and `SEKIMORE_COLOR` decide otherwise
+- no file of yours changes
+
 ## 0.2.37 (2026-09-25)
 
 ### Fix

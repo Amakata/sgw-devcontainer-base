@@ -14,6 +14,15 @@ DevContainer のベースイメージ — Dockerfile と焼き込む道具、同
 0.2.18 から始める。それ以前のリリースはここに書かない。各 PR とタグが記録。
 取り込んだ gateway の版だけは末尾にある。
 
+## 0.2.38（2026-09-25）
+
+### Enhancement
+
+- sekimore-gw 0.2.40 を取り込む
+- `relay:verify` は端末で OK を緑、FAIL を赤で出す。`gw:*` タスクは関所の `check` と `store-status` に状態語を色付けさせる (#84)
+- そうでないときは `NO_COLOR` と `SEKIMORE_COLOR` が決める
+- あなたのファイルは変わらない
+
 ## 0.2.37（2026-09-25）
 
 ### Fix
