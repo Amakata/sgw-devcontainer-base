@@ -518,11 +518,11 @@ if [ "$MODE" = apply ] && [ "$CUR_GW" != "$NEW_GW" ]; then
     fi
     if [ "$go" = 1 ]; then
       bash "$SGW" recreate
-      st=$(bash "$SGW" gw sekimore-relay store-status 2>/dev/null || echo unavailable)
+      st=$(bash "$SGW" gw sekimore-relay store-status 2>/dev/null | head -n1 || echo unavailable); [ -n "$st" ] || st=unavailable
       if [ "$st" != unlocked ] && grep -q '"gw:unlock-auto"' "$SGW_DIR/gateway.mise.toml" && command -v mise >/dev/null 2>&1; then
         say unlock_try "$st"
         (cd "$ROOT" && mise run gw:unlock-auto) || true
-        st=$(bash "$SGW" gw sekimore-relay store-status 2>/dev/null || echo unavailable)
+        st=$(bash "$SGW" gw sekimore-relay store-status 2>/dev/null | head -n1 || echo unavailable); [ -n "$st" ] || st=unavailable
       fi
       [ "$st" = unlocked ] || remain "$(msg r_unlock)"
     else

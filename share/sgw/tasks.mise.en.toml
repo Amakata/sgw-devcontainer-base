@@ -161,7 +161,10 @@ echo
 echo "== gateway: the secret store"
 # 0.2.19: the upstream API token lives in the store, so a locked one is not a note —
 # the relay cannot reach the GitHub API at all until someone unlocks it.
-state=$(bash "$SGW" gw sekimore-relay store-status 2>/dev/null || echo unavailable)
+# first line only: the state word. A later gateway may print more under it (0.2.39 did, and
+# this case statement then failed an unlocked store)
+state=$(bash "$SGW" gw sekimore-relay store-status 2>/dev/null | head -n1 || echo unavailable)
+[ -n "$state" ] || state=unavailable
 case "$state" in
   unlocked) ok "unlocked" ;;
   "not initialised") echo "note: no store yet. mise run gw:unlock sets the passphrase" ;;
