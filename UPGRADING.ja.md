@@ -1,4 +1,4 @@
-<!-- reviewed-up-to: 0.2.43 -->
+<!-- reviewed-up-to: 0.2.44 -->
 # 更新のしかた：版ごとに必要な変更
 
 *[English](UPGRADING.md)*
@@ -34,6 +34,7 @@ changelog を参照してください。
 | 0.2.27 | [0.2.28](#0228-dependabot-アラートは任意)。**エージェントに Dependabot アラートを読ませたい場合だけ** |
 | 0.2.28 | [0.2.29](#0229-解錠を自動化できるようになった)。**解錠を自動化したい場合、または AI のコミットを Verified のままにしたい場合だけ** |
 | 0.2.29 〜 0.2.36 | [0.2.37](#0237-ゲートウェイに-pid-host-が要る)。**すべてのプロジェクト** |
+| 0.2.37 〜 0.2.43 | [0.2.44](#0244-proxyjump-の踏み台のホスト鍵が必要になった)。**上流が `ProxyJump` の踏み台を使う場合だけ** |
 
 ゲートウェイの版とは別に、base 0.2.20 より前に作ったプロジェクトは、一度だけ手作業で
 `.devcontainer/sgw/` に移行する必要があります。
@@ -467,6 +468,33 @@ docker logs "$(bash .devcontainer/sgw/sgw.sh id sekimore-gw)" 2>&1 | grep 'FORWA
 追加し、接続が失敗することを期待します。
 
 0.2.30 〜 0.2.36 では作業は不要です。
+
+## 0.2.44 ProxyJump の踏み台のホスト鍵が必要になった
+
+**このセクションは、`config.yml` の上流の `relay.ssh_options` に `ProxyJump` があるときだけ
+当てはまります。** 踏み台が無ければ作業は不要です。
+
+これまで踏み台へのホップは、関所の ssh の既定が許す形で接続していました。0.2.44 からは踏み台を含む
+すべてのホップを、上流の known_hosts に対して `StrictHostKeyChecking yes` で検証します。鍵の無い
+踏み台はもう確認を求めず、通りもしません。関所経由の git は閉じる方向で失敗し、実行すべき keyscan
+のコマンドを表示します。
+
+`mise run gw:recreate` のあと、次のどちらかを 1 回実行します。
+
+```bash
+mise run gw:login          # 不足している踏み台の鍵を取り、fingerprint を見せて yes/no を聞く
+```
+
+もう一度ログインせずに鍵だけ取るなら:
+
+```bash
+docker compose exec sekimore-gw sekimore-relay keyscan <踏み台> --port <ポート>
+docker compose exec sekimore-gw sekimore-relay keyscan <上流のホスト> --port <ポート> --upstream <ドメイン>
+```
+
+2 つめは踏み台を経由するので、1 つめのあとに実行します。
+
+0.2.38 〜 0.2.43 では作業は不要です。
 
 ## base 0.2.19 `mise run web` が自分でポートを引く
 
