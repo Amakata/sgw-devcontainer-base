@@ -17,6 +17,9 @@
 # Distributed by sgw-devcontainer-base: `mise run upgrade:apply` replaces this file, and stops
 # rather than overwrite it once it has been edited.
 set -euo pipefail
+# The Docker CLI's "What's next: Try Docker Debug…" hint after docker exec would land in the
+# middle of relay:verify's output (#102). Every host-side docker call goes through this file.
+export DOCKER_CLI_HINTS=false
 
 ROOT=${MISE_PROJECT_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}
 COMPOSE_DIR=${SGW_COMPOSE_DIR:-$ROOT/.devcontainer}
