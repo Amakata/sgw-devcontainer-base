@@ -17,6 +17,15 @@ Starts at 0.2.18. Releases before it are not written up here; the pull requests
 and the tag on each are the record. The gateway each of them took is at the
 bottom.
 
+## 0.2.37 (2026-09-25)
+
+### Fix
+
+- takes sekimore-gw 0.2.39: the relay speaks TLS to an `https://` upstream proxy before it sends the CONNECT, so a proxy that terminates TLS itself works
+- Squid gets the stored upstream proxy credential after every restart, not only after a manual unlock; the gateway watches the secret store for as long as it runs
+- the credential's state — none, locked or set — shows in `gw:check` and in the dashboard, with the command that fixes it
+- no file of yours changes
+
 ## 0.2.36 (2026-09-25)
 
 ### Security
