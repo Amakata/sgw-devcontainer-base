@@ -227,6 +227,25 @@ else
   fi
 fi
 echo
+echo "== dev: the gateway's API must not hand out the upstream proxy password"
+# sekimore-gw#217: /api/config carried squid.config_text verbatim, and with a TLS upstream proxy
+# that text holds `login=<user>:<password>` — anything in dev could read it. Gateway 0.2.43 redacts
+# the password; the password itself still has to be rotated afterwards. Squid's other forms
+# (`login=PASS`, `login=NEGOTIATE`) carry no colon and no secret.
+body=$(bash "$SGW" dev curl -sS -m 5 http://sekimore-gw:8080/api/config 2>/dev/null || true)
+if [ -z "$body" ]; then
+  echo "SKIP: the gateway's API is not reachable from dev"
+else
+  # that field is JSON-escaped for quotes, backslashes and newlines only, so a redacted entry reads
+  # literally `login=user:***`. Any other value after the colon is the password itself.
+  leak=$(printf '%s' "$body" | grep -oE 'login=[^:"\ ]+:[^"\ ]+' | grep -v ':\*\*\*$' | head -1)
+  if [ -n "$leak" ]; then
+    fail "the upstream proxy password is readable from dev in /api/config (gateway 0.2.43 or later redacts it; rotate the password after upgrading)"
+  else
+    ok "no credential in /api/config"
+  fi
+fi
+echo
 echo "== dev: the upstream proxy is used for ordinary traffic (when one is configured)"
 # With `upstream_proxy` set, everything dev sends ought to go through the gateway's Squid and out
 # through that proxy. Nothing told dev so until base 0.2.40: HTTP_PROXY and friends now come from
