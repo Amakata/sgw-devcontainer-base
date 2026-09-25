@@ -17,6 +17,13 @@ Starts at 0.2.18. Releases before it are not written up here; the pull requests
 and the tag on each are the record. The gateway each of them took is at the
 bottom.
 
+## 0.2.43 (2026-09-25)
+
+### Enhancement
+
+- `sgw.sh` silences the Docker CLI's "What's next" hints, which landed inside `relay:verify`'s output (#102)
+- takes sekimore-gw 0.2.45: `gw:login` runs on a terminal and stops before the device flow when a host key was not saved; audit entries name their path-ledger edge (sekimore-gw#230, sekimore-gw#228)
+
 ## 0.2.42 (2026-09-25)
 
 ### Enhancement
