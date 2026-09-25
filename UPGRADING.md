@@ -642,3 +642,48 @@ action against the project configuration and records it:
 `sekimore guide` lists the other commands. If one of your own scripts requires `gh`,
 install `gh` where that script runs. Note that the relay cannot see or refuse anything that
 `gh` does.
+
+## base 0.2.40 the dev container learns about the upstream proxy
+
+**This section applies only if `config.yml` sets `proxy.upstream_proxy`.**
+
+Until now nothing in dev knew about the upstream proxy, so ordinary traffic — `curl`, `pip`,
+`npm`, a language runtime — left directly instead of going through the gateway's Squid and out
+through the proxy. The gateway now writes the proxy's environment, and dev picks it up:
+
+- the gateway writes `/etc/profile.d/sekimore-proxy.sh`, and the same block in `/etc/environment`
+  between `# sekimore-proxy begin` and `# sekimore-proxy end`, with `HTTP_PROXY`, `HTTPS_PROXY`,
+  `NO_PROXY` and their lowercase twins. `NO_PROXY` lists the `domain_handlers` targets, your own
+  `proxy.no_proxy`, `localhost`, `127.0.0.1` and `sekimore-gw`
+- base 0.2.40 adds `/etc/skel/zsh-rc.d/10-sekimore-proxy.zsh`, which sources that file. Debian's
+  zsh does not read `/etc/profile.d`, and Claude Code and `docker exec` run non-login shells, so
+  the rc.d snippet is what makes every shell in dev see it
+
+**If a project already sets its own `HTTP_PROXY`** — in `devcontainer.json`, in the compose file,
+in `post-create.sh` or in its own zsh rc.d — remove it, or keep it in step with the gateway's.
+Two different values is the failure that is hard to see: one process reaches the proxy and the
+next does not. A snippet numbered after `10-` still wins, so a deliberate override keeps working.
+
+What to do:
+
+```bash
+mise run gw:recreate       # the gateway writes the files
+```
+
+Then **Rebuild Container** (`Dev Containers: Rebuild Container` in the VS Code command palette),
+which is what brings in the rc.d snippet: post-create copies `/etc/skel/zsh-rc.d/` only on a create.
+
+How to tell:
+
+```bash
+env | grep -i proxy        # in dev: HTTP_PROXY, HTTPS_PROXY, NO_PROXY and the lowercase ones
+mise run relay:verify      # on the host
+```
+
+`relay:verify` gained `== dev: the upstream proxy is used for ordinary traffic`. It says `SKIP`
+when no upstream proxy is configured, and also when the gateway is too old to report its egress
+policy — that gateway writes no `HTTPS_PROXY` either, so there is nothing yet to check. Otherwise
+it checks that dev has `HTTPS_PROXY`, and that a request that goes around it (`curl --noproxy '*'`)
+to an `allow_domains` host fails. If that request succeeds while `proxy.direct_egress` is `deny`,
+it is a **FAIL**: dev can leave without the proxy. While `direct_egress` is `allow` it is a
+warning, not a failure.

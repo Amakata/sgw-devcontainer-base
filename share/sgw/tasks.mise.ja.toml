@@ -86,7 +86,7 @@ run = 'bash "$SGW" dev cat /home/vscode/.ssh/sekimore/signing_ed25519.pub'
 
 # ---- The acceptance check ----
 ["relay:verify"]
-description = "relay の受け入れ確認: gateway の状態 / dev に依頼者の agent が届いていないこと / dev から関所経由の git・HTTPS・GitHub API 1 回"
+description = "relay の受け入れ確認: gateway の状態 / dev に依頼者の agent が届いていないこと / dev から関所経由の git・HTTPS・GitHub API 1 回 / dev の通常の通信が上流プロキシを通ること"
 run = '''
 set -u
 fail=0
@@ -224,6 +224,51 @@ else
   else
     last=$(printf '%s\n' "$err" | grep -v '^$' | tail -1)
     fail "sekimore $probe — exit $rc: $last. $hint"
+  fi
+fi
+echo
+echo "== dev: the upstream proxy is used for ordinary traffic (when one is configured)"
+# With `upstream_proxy` set, everything dev sends ought to go through the gateway's Squid and out
+# through that proxy. Nothing told dev so until base 0.2.40: HTTP_PROXY and friends now come from
+# agent-setup (/etc/profile.d/sekimore-proxy.sh, and rc.d sources it), and this checks both halves
+# — that dev has the variables, and that the way around them is closed (sgw-devcontainer-base#89).
+# jq is in the base image, but the gateway's answers are read with sed so a thinner dev works too.
+gwcfg=$(bash "$SGW" dev curl -sS -m 5 http://sekimore-gw:8080/api/config 2>/dev/null || true)
+gwpenv=$(bash "$SGW" dev curl -sS -m 5 http://sekimore-gw:8080/api/proxy-env 2>/dev/null || true)
+# "upstream_proxy": null is no proxy; a string is one. Either answer may carry it.
+upstream=$(printf '%s' "$gwpenv$gwcfg" | sed -n 's/.*"upstream_proxy"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
+# direct_egress: "deny" or "allow". A gateway older than the one that added /api/proxy-env answers
+# nothing here — and that same gateway writes no HTTPS_PROXY into dev either, so both halves below
+# would fail for everyone still on it. Its silence is not a finding; the item is skipped instead.
+direct=$(printf '%s' "$gwpenv" | sed -n 's/.*"direct_egress"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
+if [ -z "$upstream" ]; then
+  echo "SKIP: no upstream proxy configured"
+elif [ -z "$direct" ]; then
+  echo "SKIP: the gateway does not report its egress policy (needs gateway 0.2.42 or later)"
+else
+  devproxy=$(bash "$SGW" dev sh -lc 'printf %s "$HTTPS_PROXY"' 2>/dev/null || true)
+  if [ -n "$devproxy" ]; then
+    ok "dev has HTTPS_PROXY=$devproxy (upstream $upstream)"
+  else
+    fail "dev has no HTTPS_PROXY; recreate the dev container / re-run post-start so agent-setup writes it"
+  fi
+  # A wildcard entry (".example.com") is a suffix, not a host to connect to; take the first real one.
+  host=$(bash "$SGW" dev curl -sS -m 5 http://sekimore-gw:8080/api/domains/allowed 2>/dev/null |
+    tr ',[]' '\n\n\n' | sed -n 's/^[[:space:]]*"\([^".][^"]*\)"[[:space:]]*$/\1/p' | head -1)
+  if [ -z "$host" ]; then
+    echo "SKIP: no non-wildcard allow_domains entry to probe with"
+  else
+    # --noproxy '*' is the bypass itself: it goes straight out, ignoring HTTPS_PROXY.
+    bash "$SGW" dev curl --noproxy '*' -sS -m 8 -o /dev/null -w '%{http_code}' "https://$host/" >/dev/null 2>&1 && rc=0 || rc=$?
+    if [ "$rc" -eq 0 ]; then
+      if [ "$direct" = allow ]; then
+        echo "WARN: direct egress is allowed: dev's traffic to allow_domains bypasses the upstream (proxy.direct_egress: deny)"
+      else
+        fail "direct egress works although the gateway denies it (https://$host/ answered with --noproxy)"
+      fi
+    else
+      ok "direct egress to https://$host/ is closed; ordinary traffic goes through the upstream"
+    fi
   fi
 fi
 echo

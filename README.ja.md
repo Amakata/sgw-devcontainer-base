@@ -101,7 +101,7 @@ FROM ghcr.io/amakata/sgw-devcontainer-base:0.2.39
 | AI | Claude Code CLI、OpenAI Codex CLI |
 | クラウド | AWS CLI v2、Docker CE (buildx と compose を含む) |
 | ゲートウェイ | `sekimore-agent-setup.sh`、`sekimore-relay` CLI、`sekimore` ラッパー |
-| zsh の既定設定 | `/etc/skel/zsh-rc.d/`: XDG、mise の activate、エイリアス、プラグイン。post-create が `~/.config/zsh/rc.d/` に複製する |
+| zsh の既定設定 | `/etc/skel/zsh-rc.d/`: XDG、上流プロキシの環境変数、mise の activate、エイリアス、プラグイン。post-create が `~/.config/zsh/rc.d/` に複製する |
 
 - `sekimore-agent-setup.sh` と関所（sekimore-relay）の CLI `sekimore-relay` は、同じ sekimore-gw イメージから取り込む。
   両者の版はずれない。
@@ -124,6 +124,10 @@ FROM ghcr.io/amakata/sgw-devcontainer-base:0.2.39
   `mise run upgrade:sync` が現在の言語のものを取得する。
   言語は `SEKIMORE_LANG`、次に `LC_ALL`、`LC_MESSAGES`、`LANG` で決まる。
 - 保存したパスフレーズで `gw:recreate` がストアを解錠しないようにするには、`SGW_NO_AUTO_UNLOCK=1` を設定する。
+- `config.yml` に `proxy.upstream_proxy` があると、ゲートウェイが `HTTP_PROXY`・`HTTPS_PROXY`・
+  `NO_PROXY` を dev に書き、`10-sekimore-proxy.zsh` がすべてのシェルに渡す。
+  プロジェクトが独自に設定している場合は外すか値を揃える。dev の通常の通信が本当に上流を通るかは
+  `mise run relay:verify` が確認する（UPGRADING: base 0.2.40）。
 
 ```bash
 mise run upgrade          # 何が新しいか、どのファイルが変わるか、UPGRADING が何を求めるか。何も変更しない

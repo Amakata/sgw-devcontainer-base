@@ -101,7 +101,7 @@ The sample's [Dockerfile](examples/sgw-sample/.devcontainer/Dockerfile) shows ho
 | AI | Claude Code CLI, OpenAI Codex CLI |
 | Cloud | AWS CLI v2, Docker CE with buildx and compose |
 | Gateway | `sekimore-agent-setup.sh`, `sekimore-relay` CLI, `sekimore` wrapper |
-| zsh defaults | `/etc/skel/zsh-rc.d/`: XDG, mise activation, aliases, plugins. Post-create copies them into `~/.config/zsh/rc.d/` |
+| zsh defaults | `/etc/skel/zsh-rc.d/`: XDG, the upstream proxy's environment, mise activation, aliases, plugins. Post-create copies them into `~/.config/zsh/rc.d/` |
 
 - `sekimore-agent-setup.sh` and `sekimore-relay` come from the same sekimore-gw image.
   Their versions cannot diverge.
@@ -124,6 +124,10 @@ Everything copied from the sample belongs to the project, except `.devcontainer/
   `mise run upgrade:sync` fetches the one for the current language.
   The language comes from `SEKIMORE_LANG`, then `LC_ALL`, `LC_MESSAGES`, `LANG`.
 - Set `SGW_NO_AUTO_UNLOCK=1` to keep `gw:recreate` from unlocking the store with the stored passphrase.
+- With `proxy.upstream_proxy` in `config.yml`, the gateway writes `HTTP_PROXY`, `HTTPS_PROXY` and
+  `NO_PROXY` into dev and `10-sekimore-proxy.zsh` hands them to every shell.
+  A project that sets its own must remove them or keep them in step; `mise run relay:verify`
+  says whether dev's ordinary traffic really takes the upstream (UPGRADING: base 0.2.40).
 
 ```bash
 mise run upgrade          # what is newer, which files it would change, what UPGRADING asks. Changes nothing

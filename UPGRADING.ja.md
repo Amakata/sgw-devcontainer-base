@@ -608,3 +608,50 @@ GitHub CLI はイメージから削除されました。`gh` は、関所の 443
 その他のコマンドは `sekimore guide` に一覧があります。自分のスクリプトが `gh` を必要とする場合は、
 そのスクリプトを実行する環境に `gh` をインストールしてください。ただし、`gh` が行う操作は関所から
 見えず、拒否することもできません。
+
+## base 0.2.40 dev コンテナが上流プロキシを知るようになった
+
+**この節は、`config.yml` に `proxy.upstream_proxy` を設定している場合だけが対象です。**
+
+これまで dev 側は上流プロキシの存在を知らず、`curl`・`pip`・`npm`・言語のランタイムといった通常の
+通信は、ゲートウェイの Squid と上流プロキシを通らずに直接出ていました。ゲートウェイがプロキシの
+環境変数を書き出すようになり、dev がそれを読み込みます。
+
+- ゲートウェイが `/etc/profile.d/sekimore-proxy.sh` と、`/etc/environment` の
+  `# sekimore-proxy begin` / `# sekimore-proxy end` に挟まれた同じ内容を書く。中身は `HTTP_PROXY`、
+  `HTTPS_PROXY`、`NO_PROXY` と、それぞれの小文字版。`NO_PROXY` には `domain_handlers` の宛先、
+  運用者が書いた `proxy.no_proxy`、`localhost`、`127.0.0.1`、`sekimore-gw` が入る
+- base 0.2.40 が `/etc/skel/zsh-rc.d/10-sekimore-proxy.zsh` を追加し、このファイルを読み込む。
+  Debian の zsh は `/etc/profile.d` を読まず、Claude Code や `docker exec` は非ログインシェルで
+  動くため、dev のすべてのシェルに行き渡らせるのは rc.d の役目
+
+**プロジェクトが独自に `HTTP_PROXY` を設定している場合** — `devcontainer.json`、compose ファイル、
+`post-create.sh`、プロジェクト固有の zsh rc.d のいずれであれ — それを外すか、ゲートウェイの値と
+揃えてください。値が 2 種類あると、あるプロセスはプロキシに届き、別のプロセスは届かないという、
+気づきにくい壊れ方になります。`10-` より後ろの番号の snippet は依然として勝つので、意図的な上書きは
+そのまま動きます。
+
+やること:
+
+```bash
+mise run gw:recreate       # ゲートウェイがファイルを書く
+```
+
+そのあと **Rebuild Container**（VS Code のコマンドパレットで `Dev Containers: Rebuild Container`）。
+rc.d の snippet が入るのはこの作り直しのときです（post-create が `/etc/skel/zsh-rc.d/` を複製するのは
+作成時だけです）。
+
+確認:
+
+```bash
+env | grep -i proxy        # dev 内: HTTP_PROXY、HTTPS_PROXY、NO_PROXY と小文字版
+mise run relay:verify      # ホスト側
+```
+
+`relay:verify` に `== dev: the upstream proxy is used for ordinary traffic` が増えました。上流
+プロキシが未設定なら `SKIP` になります。ゲートウェイが古く egress の方針を報告しない場合も `SKIP`
+です（そのゲートウェイは `HTTPS_PROXY` も書かないので、まだ確認すべきものがありません）。設定
+されている場合は、dev に `HTTPS_PROXY` があること、およびそれを迂回する要求（`curl --noproxy '*'`）
+が `allow_domains` のホストに届かないことを確認します。`proxy.direct_egress` が `deny` なのに
+届いた場合は **FAIL** です（dev がプロキシを通らずに外へ出られる）。`allow` の場合は失敗ではなく
+警告になります。
